@@ -44,6 +44,16 @@ class Murid extends Model
         return $this->hasMany(WaliMurid::class);
     }
 
+    public function muridKelas(): HasMany
+    {
+        return $this->hasMany(MuridKelas::class);
+    }
+
+    public function kelasAktif(): HasMany
+    {
+        return $this->hasMany(MuridKelas::class)->where('status', 'aktif')->whereNull('tanggal_keluar');
+    }
+
     public function getFotoUrlAttribute(): ?string
     {
         return $this->foto ? \Storage::disk('r2')->url($this->foto) : null;

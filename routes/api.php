@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\KelasController;
 use App\Http\Controllers\MuridController;
 use App\Http\Controllers\PengajarController;
 use App\Http\Controllers\UserController;
@@ -31,4 +32,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('murid/{murid}/wali', [WaliMuridController::class, 'store']);
     Route::put('wali-murid/{waliMurid}', [WaliMuridController::class, 'update']);
     Route::delete('wali-murid/{waliMurid}', [WaliMuridController::class, 'destroy']);
+
+    Route::apiResource('kelas', KelasController::class);
+    Route::get('kelas/{kelas}/pengajar', [KelasController::class, 'pengajarIndex']);
+    Route::post('kelas/{kelas}/pengajar', [KelasController::class, 'assignPengajar']);
+    Route::delete('kelas/{kelas}/pengajar/{pengajar}', [KelasController::class, 'lepaskanPengajar']);
+    Route::get('kelas/{kelas}/murid', [KelasController::class, 'muridIndex']);
+    Route::post('kelas/{kelas}/murid', [KelasController::class, 'enrollMurid']);
+    Route::delete('kelas/{kelas}/murid/{murid}', [KelasController::class, 'keluarkanMurid']);
+    Route::post('kelas/{kelas}/naik-kelas', [KelasController::class, 'naikKelas']);
 });
