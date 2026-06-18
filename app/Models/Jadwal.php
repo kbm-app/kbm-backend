@@ -14,6 +14,8 @@ class Jadwal extends Model
         'program_id',
         'kelas_id',
         'pengajar_id',
+        'frekuensi',
+        'minggu_ke',
         'hari',
         'jam_mulai',
         'jam_selesai',
@@ -24,6 +26,7 @@ class Jadwal extends Model
     protected function casts(): array
     {
         return [
+            'minggu_ke'       => 'integer',
             'mulai_berlaku'   => 'date',
             'selesai_berlaku' => 'date',
         ];

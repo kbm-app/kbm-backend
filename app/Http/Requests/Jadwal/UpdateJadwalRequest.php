@@ -17,6 +17,8 @@ class UpdateJadwalRequest extends FormRequest
             'program_id'      => ['sometimes', 'integer', 'exists:program,id'],
             'kelas_id'        => ['nullable', 'integer', 'exists:kelas,id'],
             'pengajar_id'     => ['nullable', 'integer', 'exists:pengajar,id'],
+            'frekuensi'       => ['sometimes', 'in:mingguan,bulanan'],
+            'minggu_ke'       => ['nullable', 'integer', 'min:1', 'max:4'],
             'hari'            => ['sometimes', 'in:senin,selasa,rabu,kamis,jumat,sabtu,minggu'],
             'jam_mulai'       => ['sometimes', 'date_format:H:i'],
             'jam_selesai'     => ['sometimes', 'date_format:H:i', 'after:jam_mulai'],

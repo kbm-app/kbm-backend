@@ -7,6 +7,7 @@ use App\Http\Requests\Jadwal\UpdateJadwalRequest;
 use App\Models\Jadwal;
 use App\Models\Kelas;
 use App\Services\JadwalService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -98,11 +99,21 @@ class JadwalController extends Controller
             ->get();
 
         $urutan = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];
+
+        // Hitung minggu ke- bulan ini untuk setiap hari dalam pekan ini
+        $senin = Carbon::now()->startOfWeek(Carbon::MONDAY);
+        $mingguKePerHari = collect($urutan)->mapWithKeys(
+            fn ($hari, $i) => [$hari => (int) ceil($senin->copy()->addDays($i)->day / 7)]
+        );
+
         $grouped = $jadwal->groupBy('hari');
 
-        $result = collect($urutan)->mapWithKeys(fn ($hari) => [
-            $hari => $grouped->get($hari, collect())->sortBy('jam_mulai')->values(),
-        ]);
+        $result = collect($urutan)->mapWithKeys(function ($hari) use ($grouped, $mingguKePerHari) {
+            $filtered = $grouped->get($hari, collect())->filter(
+                fn ($j) => $j->frekuensi === 'mingguan' || $j->minggu_ke === $mingguKePerHari[$hari]
+            );
+            return [$hari => $filtered->sortBy('jam_mulai')->values()];
+        });
 
         return response()->json(['data' => $result]);
     }

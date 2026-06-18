@@ -22,6 +22,8 @@ class JadwalService
             'program_id'  => $lama->program_id,
             'kelas_id'    => $lama->kelas_id,
             'pengajar_id' => $lama->pengajar_id,
+            'frekuensi'   => $lama->frekuensi,
+            'minggu_ke'   => $lama->minggu_ke,
             'hari'        => $lama->hari,
             'jam_mulai'   => $lama->jam_mulai,
             'jam_selesai' => $lama->jam_selesai,
