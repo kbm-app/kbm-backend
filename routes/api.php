@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BabKurikulumController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\KasKategoriController;
 use App\Http\Controllers\KasTransaksiController;
 use App\Http\Controllers\JadwalController;
@@ -30,6 +31,11 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('dashboard', [DashboardController::class, 'index']);
+    Route::get('dashboard/chart-absensi', [DashboardController::class, 'chartAbsensi']);
+    Route::get('dashboard/chart-kas', [DashboardController::class, 'chartKas']);
+    Route::get('dashboard/chart-materi', [DashboardController::class, 'chartMateri']);
+
     Route::apiResource('users', UserController::class);
     Route::put('users/{user}/toggle', [UserController::class, 'toggleActive']);
 
