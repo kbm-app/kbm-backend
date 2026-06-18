@@ -76,7 +76,7 @@ class MateriController extends Controller
         $this->authorize('manageProgress', $materi->kurikulum);
 
         $request->validate([
-            'pertemuan_id' => ['required', 'integer', 'exists:pertemuan,id'],
+            'pertemuan_id' => ['nullable', 'integer', 'exists:pertemuan,id'],
         ]);
 
         $this->service->selesaikanMateriUmum($materi, $request->pertemuan_id);

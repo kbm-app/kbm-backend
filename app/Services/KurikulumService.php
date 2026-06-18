@@ -113,7 +113,7 @@ class KurikulumService
             ->with('bab:id,kode,nama')
             ->get()
             ->groupBy('bab_kurikulum_id')
-            ->map(function ($items) use ($materiIds) {
+            ->map(function ($items) {
                 $bab    = $items->first()->bab;
                 $ids    = $items->pluck('id');
                 $done   = ProgressMateriMurid::whereIn('materi_id', $ids)
@@ -136,7 +136,7 @@ class KurikulumService
         ];
     }
 
-    public function selesaikanMateriUmum(Materi $materi, int $pertemuanId): void
+    public function selesaikanMateriUmum(Materi $materi, ?int $pertemuanId): void
     {
         if ($materi->tipe !== 'umum') {
             throw ValidationException::withMessages([

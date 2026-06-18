@@ -79,6 +79,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('pertemuan/{pertemuan}/absensi-pengajar', [PertemuanController::class, 'absensiPengajarStore']);
 
     // Kurikulum
+    // Harus sebelum {kurikulum} agar 'aktif-kelas' tidak ditangkap sebagai param
+    Route::get('kurikulum/aktif-kelas/{kelas}', [KurikulumController::class, 'aktifUntukKelas']);
     Route::get('kurikulum', [KurikulumController::class, 'index']);
     Route::post('kurikulum', [KurikulumController::class, 'store']);
     Route::get('kurikulum/{kurikulum}', [KurikulumController::class, 'show']);
