@@ -16,6 +16,9 @@ use App\Http\Controllers\ProgressMateriController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WaliMuridController;
+use App\Http\Controllers\PengumumanController;
+use App\Http\Controllers\WaLogController;
+use App\Http\Controllers\WaSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -131,4 +134,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('kas/transaksi', [KasTransaksiController::class, 'store']);
     Route::put('kas/transaksi/{kasTransaksi}', [KasTransaksiController::class, 'update']);
     Route::delete('kas/transaksi/{kasTransaksi}', [KasTransaksiController::class, 'destroy']);
+
+    // Pengumuman
+    Route::get('pengumuman', [PengumumanController::class, 'index']);
+    Route::post('pengumuman', [PengumumanController::class, 'store']);
+    Route::get('pengumuman/{pengumuman}', [PengumumanController::class, 'show']);
+
+    // WA Log
+    Route::get('wa-log', [WaLogController::class, 'index']);
+    Route::post('wa-log/{waLog}/retry', [WaLogController::class, 'retry']);
+
+    // Settings WA (Super Admin)
+    Route::get('settings/wa', [WaSettingsController::class, 'show']);
+    Route::put('settings/wa', [WaSettingsController::class, 'update']);
+    Route::get('settings/wa/status', [WaSettingsController::class, 'status']);
+    Route::get('settings/wa/qr', [WaSettingsController::class, 'qr']);
+    Route::post('settings/wa/reconnect', [WaSettingsController::class, 'reconnect']);
+    Route::post('settings/wa/test', [WaSettingsController::class, 'test']);
 });
