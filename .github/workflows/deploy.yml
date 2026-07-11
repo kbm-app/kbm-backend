@@ -11,19 +11,23 @@ concurrency:
 
 jobs:
   deploy:
-    # Self-hosted runner installed directly on the target VPS (see
-    # deploy/DEPLOYMENT.md, step 10) — no SSH hop needed, this runs where the
-    # containers already are.
-    runs-on: [self-hosted, kbm]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
       # Vendor is intentionally excluded — the app container runs `composer install`
       # itself on every start (see deploy/docker-compose.yml), so it doesn't need
-      # to be synced here.
-      - name: Sync to deploy directory
+      # to be pushed here.
+      - name: Rsync code to VPS
         run: |
-          rsync -a --delete \
+          rsync -avz --delete \
             --exclude='vendor' \
             --exclude='.git' \
             --exclude='.env' \
@@ -33,11 +37,12 @@ jobs:
             --exclude='storage/framework/sessions/*' \
             --exclude='storage/framework/views/*' \
             --exclude='.phpunit.cache' \
-            ./ /var/www/kbm/kbm-backend/
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/kbm/kbm-backend/
 
       # `app`'s command chain reinstalls composer deps, caches config/routes, and
       # runs `migrate --force` on every start — a restart is a full redeploy.
-      - name: Restart containers
+      - name: Restart containers on VPS
         run: |
-          cd /var/www/kbm/deploy
-          docker compose -p kbm restart app queue web
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "cd /var/www/kbm/deploy && docker compose -p kbm restart app queue web"
