@@ -15,5 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // API-only app (routes/web.php has no login page), so an unauthenticated
+        // request must never fall back to Authenticate::redirectTo()'s route('login')
+        // — that route doesn't exist here and turns what should be a 401 into a 500.
+        $exceptions->shouldRenderJsonWhen(fn () => true);
     })->create();
