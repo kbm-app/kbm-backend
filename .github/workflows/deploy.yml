@@ -11,23 +11,20 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # Self-hosted runner installed directly on the target VPS (see
+    # deploy/DEPLOYMENT.md, step 10). GitHub-hosted runners are blocked by an
+    # account-level billing issue that persists even with a public repo — see
+    # DEPLOYMENT.md for the full story before switching this back.
+    runs-on: [self-hosted, kbm]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
-
       # Vendor is intentionally excluded — the app container runs `composer install`
       # itself on every start (see deploy/docker-compose.yml), so it doesn't need
-      # to be pushed here.
-      - name: Rsync code to VPS
+      # to be synced here.
+      - name: Sync to deploy directory
         run: |
-          rsync -avz --delete \
+          rsync -a --delete \
             --exclude='vendor' \
             --exclude='.git' \
             --exclude='.env' \
@@ -37,12 +34,11 @@ jobs:
             --exclude='storage/framework/sessions/*' \
             --exclude='storage/framework/views/*' \
             --exclude='.phpunit.cache' \
-            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
-            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/kbm/kbm-backend/
+            ./ /var/www/kbm/kbm-backend/
 
       # `app`'s command chain reinstalls composer deps, caches config/routes, and
       # runs `migrate --force` on every start — a restart is a full redeploy.
-      - name: Restart containers on VPS
+      - name: Restart containers
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "cd /var/www/kbm/deploy && docker compose -p kbm restart app queue web"
+          cd /var/www/kbm/deploy
+          docker compose -p kbm restart app queue web
