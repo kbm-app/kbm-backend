@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <style>
   @page { margin: 15mm 18mm; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * { box-sizing: border-box; }
+  body, h1, h2 { margin: 0; padding: 0; }
   body { font-family: 'DejaVu Sans', sans-serif; font-size: 10px; color: #1e293b; }
 
   .header { text-align: center; padding-bottom: 12px; border-bottom: 2px solid #334155; margin-bottom: 10px; }
