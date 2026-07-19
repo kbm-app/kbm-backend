@@ -59,7 +59,7 @@ class PertemuanController extends Controller
             'jadwal',
             'absensiMurid.murid',
             'absensiPengajar.pengajar.user',
-            'absensiPengajar.pengajarPengganti.user',
+            'absensiPengajar.pengganti.user',
         ]);
 
         return response()->json(['pertemuan' => $pertemuan]);
@@ -126,7 +126,7 @@ class PertemuanController extends Controller
             $data
         );
 
-        return response()->json(['absensi_pengajar' => $absensi->load(['pengajar.user', 'pengajarPengganti.user'])]);
+        return response()->json(['absensi_pengajar' => $absensi->load(['pengajar.user', 'pengganti.user'])]);
     }
 
     // --- Selesai / Batalkan ---

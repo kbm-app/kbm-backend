@@ -12,9 +12,9 @@ class AbsensiPengajar extends Model
     protected $fillable = [
         'pertemuan_id',
         'pengajar_id',
-        'pengajar_pengganti_id',
+        'pengganti_id',
         'status',
-        'catatan',
+        'keterangan',
     ];
 
     public function pertemuan(): BelongsTo
@@ -27,8 +27,8 @@ class AbsensiPengajar extends Model
         return $this->belongsTo(Pengajar::class);
     }
 
-    public function pengajarPengganti(): BelongsTo
+    public function pengganti(): BelongsTo
     {
-        return $this->belongsTo(Pengajar::class, 'pengajar_pengganti_id');
+        return $this->belongsTo(Pengajar::class, 'pengganti_id');
     }
 }

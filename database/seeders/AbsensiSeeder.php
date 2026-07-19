@@ -38,7 +38,7 @@ class AbsensiSeeder extends Seeder
                 'jam_selesai' => '16:30:00',
                 'materi'    => 'Iqra Jilid 3 halaman 1–4',
                 'catatan'   => 'Murid tampak semangat mengikuti pelajaran',
-                'ap_status' => 'pengganti',
+                'ap_status' => 'digantikan',
                 'ap_pengganti_email' => 'ahmad.fauzi@kbm.id',
                 'ap_catatan' => 'Siti Aminah berhalangan, digantikan Ahmad Fauzi',
                 'absensi_murid' => [
@@ -102,7 +102,7 @@ class AbsensiSeeder extends Seeder
                 'jam_selesai' => '17:28:00',
                 'materi'    => 'Tajwid: Hukum Nun Mati — Idgham',
                 'catatan'   => null,
-                'ap_status' => 'izin',
+                'ap_status' => 'berhalangan',
                 'ap_pengganti_email' => null,
                 'ap_catatan' => 'Ahmad Fauzi berhalangan hadir, sesi tetap jalan dipandu mandiri',
                 'absensi_murid' => [
@@ -236,7 +236,7 @@ class AbsensiSeeder extends Seeder
             );
 
             // Tentukan pengajar yang mencatat absensi
-            $pencatatId = $sesi['ap_status'] === 'pengganti' && $sesi['ap_pengganti_email']
+            $pencatatId = $sesi['ap_status'] === 'digantikan' && $sesi['ap_pengganti_email']
                 ? $this->userIdDariEmail($sesi['ap_pengganti_email'])
                 : ($pengajar->user_id ?? $superadminId);
 
@@ -268,10 +268,10 @@ class AbsensiSeeder extends Seeder
             AbsensiPengajar::firstOrCreate(
                 ['pertemuan_id' => $pertemuan->id],
                 [
-                    'pengajar_id'           => $pengajar->id,
-                    'pengajar_pengganti_id' => $penggantiId,
-                    'status'                => $sesi['ap_status'],
-                    'catatan'               => $sesi['ap_catatan'],
+                    'pengajar_id'   => $pengajar->id,
+                    'pengganti_id'  => $penggantiId,
+                    'status'        => $sesi['ap_status'],
+                    'keterangan'    => $sesi['ap_catatan'],
                 ]
             );
         }
@@ -332,10 +332,10 @@ class AbsensiSeeder extends Seeder
         AbsensiPengajar::firstOrCreate(
             ['pertemuan_id' => $pertemuan->id],
             [
-                'pengajar_id'           => $pengajar->id,
-                'pengajar_pengganti_id' => null,
-                'status'                => 'hadir',
-                'catatan'               => null,
+                'pengajar_id'  => $pengajar->id,
+                'pengganti_id' => null,
+                'status'       => 'hadir',
+                'keterangan'   => null,
             ]
         );
     }
