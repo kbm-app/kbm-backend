@@ -46,9 +46,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('users/{user}/toggle', [UserController::class, 'toggleActive']);
 
     Route::apiResource('pengajar', PengajarController::class);
+    Route::get('pengajar/{pengajar}/dampak-hapus', [PengajarController::class, 'deleteImpact']);
     Route::put('pengajar/{pengajar}/toggle', [PengajarController::class, 'toggleAktif']);
 
     Route::apiResource('murid', MuridController::class);
+    Route::get('murid/{murid}/dampak-hapus', [MuridController::class, 'deleteImpact']);
     Route::get('murid/{murid}/wali', [WaliMuridController::class, 'index']);
     Route::post('murid/{murid}/wali', [WaliMuridController::class, 'store']);
     Route::put('wali-murid/{waliMurid}', [WaliMuridController::class, 'update']);
@@ -57,10 +59,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('kelas', KelasController::class);
     Route::get('kelas/{kelas}/pengajar', [KelasController::class, 'pengajarIndex']);
     Route::post('kelas/{kelas}/pengajar', [KelasController::class, 'assignPengajar']);
-    Route::delete('kelas/{kelas}/pengajar/{pengajar}', [KelasController::class, 'lepaskanPengajar']);
+    Route::delete('kelas/{kelas}/pengajar/{pengajar}', [KelasController::class, 'lepaskanPengajar'])->withTrashed();
     Route::get('kelas/{kelas}/murid', [KelasController::class, 'muridIndex']);
     Route::post('kelas/{kelas}/murid', [KelasController::class, 'enrollMurid']);
-    Route::delete('kelas/{kelas}/murid/{murid}', [KelasController::class, 'keluarkanMurid']);
+    Route::delete('kelas/{kelas}/murid/{murid}', [KelasController::class, 'keluarkanMurid'])->withTrashed();
     Route::post('kelas/{kelas}/naik-kelas', [KelasController::class, 'naikKelas']);
     Route::get('kelas/{kelas}/jadwal', [JadwalController::class, 'jadwalKelas']);
 

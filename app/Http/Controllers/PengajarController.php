@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Pengajar\StorePengajarRequest;
 use App\Http\Requests\Pengajar\UpdatePengajarRequest;
+use App\Models\AbsensiPengajar;
+use App\Models\KelasGuru;
 use App\Models\Pengajar;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PengajarController extends Controller
 {
@@ -36,9 +39,29 @@ class PengajarController extends Controller
         return response()->json(['pengajar' => $pengajar->load('user')]);
     }
 
+    public function deleteImpact(Pengajar $pengajar): JsonResponse
+    {
+        $this->authorize('delete', $pengajar);
+
+        return response()->json([
+            'kelas_aktif'   => $pengajar->kelasGuru()->with('kelas:id,nama')->get()->pluck('kelas.nama'),
+            'riwayat_kelas' => $pengajar->kelasGuru()->count(),
+            'absensi'       => AbsensiPengajar::where('pengajar_id', $pengajar->id)->count(),
+        ]);
+    }
+
     public function destroy(Pengajar $pengajar): JsonResponse
     {
-        $pengajar->delete();
+        $this->authorize('delete', $pengajar);
+
+        DB::transaction(function () use ($pengajar) {
+            AbsensiPengajar::where('pengganti_id', $pengajar->id)->update(['pengganti_id' => null]);
+            AbsensiPengajar::where('pengajar_id', $pengajar->id)->delete();
+            KelasGuru::where('pengajar_id', $pengajar->id)->delete();
+
+            $pengajar->delete();
+        });
+
         return response()->json(null, 204);
     }
 

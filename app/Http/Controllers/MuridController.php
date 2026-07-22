@@ -43,9 +43,16 @@ class MuridController extends Controller
         return response()->json(['murid' => $murid]);
     }
 
+    public function deleteImpact(Murid $murid): JsonResponse
+    {
+        $this->authorize('delete', $murid);
+        return response()->json($this->muridService->deleteImpact($murid));
+    }
+
     public function destroy(Murid $murid): JsonResponse
     {
-        $murid->delete();
+        $this->authorize('delete', $murid);
+        $this->muridService->delete($murid);
         return response()->json(null, 204);
     }
 }
