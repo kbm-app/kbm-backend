@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\AbsensiMurid;
 use App\Models\Kelas;
 use App\Models\KelasGuru;
 use App\Models\MuridKelas;
+use App\Models\Pertemuan;
 use Illuminate\Support\Facades\DB;
 
 class KelasService
@@ -41,14 +43,38 @@ class KelasService
                 abort(422, 'Murid sudah terdaftar aktif di kelas lain. Keluarkan murid dari kelas sebelumnya terlebih dahulu.');
             }
 
-            return MuridKelas::create([
+            $muridKelas = MuridKelas::create([
                 'murid_id'      => $data['murid_id'],
                 'kelas_id'      => $kelas->id,
                 'tahun_ajaran'  => $data['tahun_ajaran'],
                 'tanggal_masuk' => $data['tanggal_masuk'] ?? now()->toDateString(),
                 'status'        => 'aktif',
             ]);
+
+            $this->syncAbsensiSesiBerlangsung($kelas->id, $data['murid_id']);
+
+            return $muridKelas;
         });
+    }
+
+    private function syncAbsensiSesiBerlangsung(int $kelasId, int $muridId): void
+    {
+        $pertemuanIds = Pertemuan::untukKelas($kelasId)
+            ->berlangsung()
+            ->pluck('id');
+
+        foreach ($pertemuanIds as $pertemuanId) {
+            AbsensiMurid::firstOrCreate(
+                [
+                    'pertemuan_id' => $pertemuanId,
+                    'murid_id'     => $muridId,
+                ],
+                [
+                    'status'       => 'alpha',
+                    'dicatat_oleh' => null,
+                ]
+            );
+        }
     }
 
     public function naikKelas(Kelas $asal, Kelas $tujuan, array $muridIds): void
