@@ -51,29 +51,45 @@ class KelasService
                 'status'        => 'aktif',
             ]);
 
-            $this->syncAbsensiSesiBerlangsung($kelas->id, $data['murid_id']);
+            $this->syncAbsensiSesiBerlangsung($kelas->id);
 
             return $muridKelas;
         });
     }
 
-    private function syncAbsensiSesiBerlangsung(int $kelasId, int $muridId): void
+    private function syncAbsensiSesiBerlangsung(int $kelasId): void
     {
         $pertemuanIds = Pertemuan::untukKelas($kelasId)
             ->berlangsung()
             ->pluck('id');
 
+        if ($pertemuanIds->isEmpty()) {
+            return;
+        }
+
+        $muridIds = MuridKelas::where('kelas_id', $kelasId)
+            ->aktif()
+            ->pluck('murid_id');
+
+        $now = now();
+
         foreach ($pertemuanIds as $pertemuanId) {
-            AbsensiMurid::firstOrCreate(
-                [
-                    'pertemuan_id' => $pertemuanId,
-                    'murid_id'     => $muridId,
-                ],
-                [
-                    'status'       => 'alpha',
-                    'dicatat_oleh' => null,
-                ]
+            $muridBelumTercatat = $muridIds->diff(
+                AbsensiMurid::where('pertemuan_id', $pertemuanId)->pluck('murid_id')
             );
+
+            if ($muridBelumTercatat->isEmpty()) {
+                continue;
+            }
+
+            AbsensiMurid::insert($muridBelumTercatat->map(fn ($muridId) => [
+                'pertemuan_id' => $pertemuanId,
+                'murid_id'     => $muridId,
+                'status'       => 'alpha',
+                'dicatat_oleh' => null,
+                'created_at'   => $now,
+                'updated_at'   => $now,
+            ])->values()->all());
         }
     }
 
@@ -104,6 +120,8 @@ class KelasService
                     'status'        => 'aktif',
                 ]);
             }
+
+            $this->syncAbsensiSesiBerlangsung($tujuan->id);
         });
     }
 }
