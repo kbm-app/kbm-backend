@@ -74,7 +74,7 @@ class Pertemuan extends Model
 
     public function absensiMurid(): HasMany
     {
-        return $this->hasMany(AbsensiMurid::class);
+        return $this->hasMany(AbsensiMurid::class)->orderBy('murid_id');
     }
 
     public function absensiPengajar(): HasOne
