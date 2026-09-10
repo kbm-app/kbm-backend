@@ -42,7 +42,13 @@ jobs:
 
       # `app`'s command chain reinstalls composer deps, caches config/routes, and
       # runs `migrate --force` on every start — a restart is a full redeploy.
+      #
+      # Uses `up -d`, not `restart`: app/queue read their env via `env_file:
+      # ../kbm-backend/.env` in docker-compose.yml, which Compose only re-reads
+      # when a container is (re)created. `restart` reuses the existing container
+      # and its already-materialized environment, so a change to .env (e.g. new
+      # MAIL_* credentials) would silently keep running with stale values.
       - name: Restart containers on VPS
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "cd /var/www/kbm/deploy && docker compose -p kbm restart app queue web"
+            "cd /var/www/kbm/deploy && docker compose -p kbm up -d app queue web"
