@@ -3,9 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Enums\UserRole;
+use App\Mail\SetPasswordMail;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
@@ -39,14 +44,16 @@ class UserController extends Controller
         $this->authorize('create', User::class);
 
         $data = $request->validate([
-            'name'     => ['required', 'string', 'max:255'],
-            'email'    => ['required', 'email', 'unique:users'],
-            'phone'    => ['nullable', 'string', 'unique:users'],
-            'password' => ['required', 'min:8'],
-            'role'     => ['required', Rule::enum(UserRole::class)],
+            'name'  => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'unique:users'],
+            'phone' => ['nullable', 'string', 'unique:users'],
+            'role'  => ['required', Rule::enum(UserRole::class)],
         ]);
 
-        $user = User::create($data);
+        $user = User::create([...$data, 'password' => Hash::make(Str::random(40))]);
+
+        $token = Password::broker()->createToken($user);
+        Mail::to($user)->send(new SetPasswordMail($user, $token));
 
         return response()->json(['user' => $user], 201);
     }

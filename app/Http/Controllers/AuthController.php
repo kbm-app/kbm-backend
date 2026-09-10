@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Auth\ChangePasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\SetPasswordRequest;
 use App\Http\Requests\Auth\UpdateProfileRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -33,6 +35,22 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         return response()->json(['user' => $user]);
+    }
+
+    public function setPassword(SetPasswordRequest $request): JsonResponse
+    {
+        $status = Password::broker()->reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            fn ($user, $password) => $user->update(['password' => $password])
+        );
+
+        if ($status !== Password::PASSWORD_RESET) {
+            throw ValidationException::withMessages([
+                'email' => ['Link tidak valid atau sudah kedaluwarsa.'],
+            ]);
+        }
+
+        return response()->json(['message' => 'Password berhasil diatur.']);
     }
 
     public function logout(Request $request): JsonResponse
