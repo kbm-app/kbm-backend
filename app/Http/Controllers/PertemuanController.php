@@ -9,6 +9,7 @@ use App\Http\Requests\Absensi\UpdateAbsensiMuridRequest;
 use App\Http\Requests\Absensi\UpdatePertemuanRequest;
 use App\Models\AbsensiMurid;
 use App\Models\AbsensiPengajar;
+use App\Models\Murid;
 use App\Models\Pertemuan;
 use App\Services\AbsensiService;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,8 @@ class PertemuanController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Pertemuan::class);
+
         $user = $request->user();
 
         $query = Pertemuan::with(['kelas', 'program', 'pengajar.user'])
@@ -204,6 +207,8 @@ class PertemuanController extends Controller
 
     public function rekapSatuMurid(Request $request, int $muridId): JsonResponse
     {
+        $this->authorize('view', Murid::findOrFail($muridId));
+
         $request->validate([
             'bulan' => ['required', 'integer', 'min:1', 'max:12'],
             'tahun' => ['required', 'integer', 'min:2020'],

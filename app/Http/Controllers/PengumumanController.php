@@ -14,6 +14,8 @@ class PengumumanController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        abort_unless($request->user()->role->value === 'super_admin', 403);
+
         $pengumuman = Pengumuman::with(['pembuat:id,name', 'kelas:id,nama'])
             ->latest()
             ->paginate(15);
@@ -23,6 +25,8 @@ class PengumumanController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        abort_unless($request->user()->role->value === 'super_admin', 403);
+
         $data = $request->validate([
             'judul'    => 'required|string|min:3|max:200',
             'konten'   => 'required|string|min:10',
@@ -44,6 +48,8 @@ class PengumumanController extends Controller
 
     public function show(Pengumuman $pengumuman): JsonResponse
     {
+        abort_unless(Auth::user()->role->value === 'super_admin', 403);
+
         $pengumuman->load(['pembuat:id,name', 'kelas:id,nama', 'waLogs']);
 
         $stats = [

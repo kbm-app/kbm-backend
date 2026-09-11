@@ -14,6 +14,8 @@ class ProgramController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Program::class);
+
         $query = Program::withCount(['programKelas as jumlah_kelas'])
             ->when($request->jenis, fn ($q) => $q->where('jenis', $request->jenis))
             ->when($request->has('is_aktif'), fn ($q) => $q->where('is_aktif', $request->boolean('is_aktif')))

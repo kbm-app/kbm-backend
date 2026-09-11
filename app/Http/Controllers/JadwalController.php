@@ -17,6 +17,8 @@ class JadwalController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Jadwal::class);
+
         $query = Jadwal::with(['program', 'kelas', 'pengajar.user'])
             ->when($request->program_id, fn ($q) => $q->where('program_id', $request->program_id))
             ->when($request->kelas_id, fn ($q) => $q->where('kelas_id', $request->kelas_id))
@@ -86,12 +88,16 @@ class JadwalController extends Controller
 
     public function jadwalKelas(Request $request, Kelas $kelas): JsonResponse
     {
+        $this->authorize('view', $kelas);
+
         $jadwal = $this->service->getAktif($kelas->id);
         return response()->json(['data' => $jadwal]);
     }
 
     public function mingguIni(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Jadwal::class);
+
         $jadwal = Jadwal::aktif()
             ->with(['program', 'kelas', 'pengajar.user'])
             ->when($request->program_id, fn ($q) => $q->where('program_id', $request->program_id))

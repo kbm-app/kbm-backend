@@ -13,6 +13,11 @@ class WaSettingsController extends Controller
 {
     public function __construct(private WaServiceInterface $wa) {}
 
+    private function ensureSuperAdmin(): void
+    {
+        abort_unless(Auth::user()->role->value === 'super_admin', 403);
+    }
+
     // ─── Helpers ─────────────────────────────────────────────────────────────────
 
     private function openwaHeaders(): array
@@ -61,6 +66,8 @@ class WaSettingsController extends Controller
 
     public function show(): JsonResponse
     {
+        $this->ensureSuperAdmin();
+
         return response()->json([
             'provider'   => config('wa.provider'),
             'base_url'   => config('wa.base_url'),
@@ -70,6 +77,8 @@ class WaSettingsController extends Controller
 
     public function status(): JsonResponse
     {
+        $this->ensureSuperAdmin();
+
         if (config('wa.provider') !== 'openwa') {
             return response()->json(['status' => 'disabled', 'phone' => null]);
         }
@@ -101,6 +110,8 @@ class WaSettingsController extends Controller
 
     public function qr(): JsonResponse
     {
+        $this->ensureSuperAdmin();
+
         if (config('wa.provider') !== 'openwa') {
             return response()->json(['message' => 'Provider bukan OpenWA.'], 422);
         }
@@ -128,6 +139,8 @@ class WaSettingsController extends Controller
 
     public function reconnect(): JsonResponse
     {
+        $this->ensureSuperAdmin();
+
         if (config('wa.provider') !== 'openwa') {
             return response()->json(['message' => 'Provider bukan OpenWA.'], 422);
         }
@@ -160,6 +173,8 @@ class WaSettingsController extends Controller
 
     public function update(Request $request): JsonResponse
     {
+        $this->ensureSuperAdmin();
+
         $data = $request->validate([
             'provider'   => 'required|in:openwa,fonnte,null',
             'base_url'   => 'nullable|url',
@@ -195,6 +210,8 @@ class WaSettingsController extends Controller
 
     public function test(): JsonResponse
     {
+        $this->ensureSuperAdmin();
+
         $user = Auth::user();
 
         if (!$user->phone) {

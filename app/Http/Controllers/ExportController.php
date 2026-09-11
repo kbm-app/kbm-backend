@@ -18,6 +18,7 @@ use App\Models\Murid;
 use App\Models\Musyawarah;
 use App\Models\Pengajar;
 use App\Models\Pertemuan;
+use App\Models\Program;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -31,6 +32,8 @@ class ExportController extends Controller
 
     public function muridExcel(Request $request): BinaryFileResponse
     {
+        $this->authorize('viewAny', Murid::class);
+
         $filters  = $request->only(['search', 'status', 'kelas_id', 'usia_min', 'usia_max']);
         $filename = 'data-murid-' . now()->format('Ymd') . '.xlsx';
 
@@ -39,6 +42,8 @@ class ExportController extends Controller
 
     public function muridPdf(Request $request): Response
     {
+        $this->authorize('viewAny', Murid::class);
+
         $filters     = $request->only(['search', 'status', 'kelas_id', 'usia_min', 'usia_max']);
         $filterLabel = $this->buildMuridFilterLabel($filters);
 
@@ -71,6 +76,8 @@ class ExportController extends Controller
 
     public function muridTemplate(): BinaryFileResponse
     {
+        $this->authorize('create', Murid::class);
+
         return Excel::download(new MuridTemplateExport(), 'template-import-murid.xlsx');
     }
 
@@ -78,6 +85,8 @@ class ExportController extends Controller
 
     public function pengajarExcel(Request $request): BinaryFileResponse
     {
+        $this->authorize('viewAny', Pengajar::class);
+
         $filters  = $request->only(['search', 'is_aktif']);
         $filename = 'data-pengajar-' . now()->format('Ymd') . '.xlsx';
 
@@ -86,6 +95,8 @@ class ExportController extends Controller
 
     public function pengajarPdf(Request $request): Response
     {
+        $this->authorize('viewAny', Pengajar::class);
+
         $filters     = $request->only(['search', 'is_aktif']);
         $filterLabel = $this->buildPengajarFilterLabel($filters);
 
@@ -111,6 +122,8 @@ class ExportController extends Controller
 
     public function pengajarTemplate(): BinaryFileResponse
     {
+        $this->authorize('create', Pengajar::class);
+
         return Excel::download(new PengajarTemplateExport(), 'template-import-pengajar.xlsx');
     }
 
@@ -121,6 +134,8 @@ class ExportController extends Controller
         $request->validate(['kelas_id' => 'required|exists:kelas,id']);
 
         $kelas   = Kelas::findOrFail($request->kelas_id);
+        $this->authorize('viewKasTransaksi', $kelas);
+
         $filters = $request->only(['bulan', 'tahun', 'kategori_id', 'jenis']);
         $periode = $this->buildPeriodeLabel($filters['bulan'] ?? null, $filters['tahun'] ?? null);
         $slug    = str_replace(' ', '-', strtolower($kelas->nama));
@@ -134,6 +149,8 @@ class ExportController extends Controller
         $request->validate(['kelas_id' => 'required|exists:kelas,id']);
 
         $kelas   = Kelas::findOrFail($request->kelas_id);
+        $this->authorize('viewKasTransaksi', $kelas);
+
         $filters = $request->only(['bulan', 'tahun', 'kategori_id', 'jenis']);
         $filterLabel = $this->buildKasFilterLabel($filters, $kelas);
 
@@ -181,6 +198,8 @@ class ExportController extends Controller
         ]);
 
         $kelas        = Kelas::findOrFail($request->kelas_id);
+        $this->authorize('view', $kelas);
+
         $bulan        = (int) $request->bulan;
         $tahun        = (int) $request->tahun;
         $periodeLabel = $this->buildPeriodeLabel($bulan, $tahun);
@@ -199,6 +218,8 @@ class ExportController extends Controller
         ]);
 
         $kelas = Kelas::findOrFail($request->kelas_id);
+        $this->authorize('view', $kelas);
+
         $bulan = (int) $request->bulan;
         $tahun = (int) $request->tahun;
 
@@ -253,6 +274,8 @@ class ExportController extends Controller
 
     public function kelasRosterExcel(Request $request, Kelas $kelas): BinaryFileResponse
     {
+        $this->authorize('view', $kelas);
+
         $slug     = str_replace(' ', '-', strtolower($kelas->nama));
         $filename = "roster-kelas-{$slug}-" . now()->format('Ymd') . '.xlsx';
 
@@ -261,6 +284,8 @@ class ExportController extends Controller
 
     public function kelasRosterPdf(Request $request, Kelas $kelas): Response
     {
+        $this->authorize('view', $kelas);
+
         $muridKelas = MuridKelas::with('murid')
             ->where('kelas_id', $kelas->id)
             ->aktif()
@@ -283,6 +308,8 @@ class ExportController extends Controller
 
     public function programExcel(Request $request): BinaryFileResponse
     {
+        $this->authorize('viewAny', Program::class);
+
         $filters  = $request->only(['search', 'is_aktif']);
         $filename = 'data-program-' . now()->format('Ymd') . '.xlsx';
 
@@ -293,6 +320,8 @@ class ExportController extends Controller
 
     public function musyawarahPdf(Request $request, Musyawarah $musyawarah): Response
     {
+        abort_unless($request->user()->role->value === 'super_admin', 403);
+
         $musyawarah->load(['laporan.kelas', 'notulensi']);
 
         $notulensiByKategori = $musyawarah->notulensi->groupBy('kategori');

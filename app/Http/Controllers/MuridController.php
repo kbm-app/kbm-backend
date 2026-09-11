@@ -15,6 +15,8 @@ class MuridController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Murid::class);
+
         $query = Murid::with(['waliMurid', 'kelasAktif.kelas'])
             ->when($request->search, fn($q) => $q->where('nama', 'like', "%{$request->search}%"))
             ->when($request->status, fn($q) => $q->where('status', $request->status))
@@ -34,6 +36,8 @@ class MuridController extends Controller
 
     public function show(Murid $murid): JsonResponse
     {
+        $this->authorize('view', $murid);
+
         return response()->json(['murid' => $murid->load('waliMurid', 'user')]);
     }
 

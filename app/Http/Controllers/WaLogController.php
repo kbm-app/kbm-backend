@@ -13,6 +13,8 @@ class WaLogController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        abort_unless($request->user()->role->value === 'super_admin', 403);
+
         $query = WaLog::latest();
 
         if ($request->filled('tipe')) {
@@ -30,8 +32,10 @@ class WaLogController extends Controller
         return response()->json($query->paginate(20));
     }
 
-    public function retry(WaLog $waLog): JsonResponse
+    public function retry(Request $request, WaLog $waLog): JsonResponse
     {
+        abort_unless($request->user()->role->value === 'super_admin', 403);
+
         if ($waLog->status !== 'gagal') {
             return response()->json(['message' => 'Hanya log dengan status gagal yang bisa di-retry.'], 422);
         }

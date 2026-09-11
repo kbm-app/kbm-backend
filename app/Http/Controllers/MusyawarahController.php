@@ -12,6 +12,7 @@ use App\Models\NotulensiMusyawarah;
 use App\Services\MusyawarahService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -19,10 +20,17 @@ class MusyawarahController extends Controller
 {
     public function __construct(private MusyawarahService $service) {}
 
+    private function ensureSuperAdmin(): void
+    {
+        abort_unless(Auth::user()->role->value === 'super_admin', 403);
+    }
+
     // --- Musyawarah ---
 
     public function index(Request $request): JsonResponse
     {
+        $this->ensureSuperAdmin();
+
         $data = Musyawarah::with('createdBy:id,name')
             ->withCount('laporan')
             ->withCount('notulensi')
@@ -65,6 +73,8 @@ class MusyawarahController extends Controller
 
     public function show(Musyawarah $musyawarah): JsonResponse
     {
+        $this->ensureSuperAdmin();
+
         $musyawarah->load([
             'laporan.kelas.kelasGuru.pengajar.user',
             'notulensi',
@@ -87,6 +97,8 @@ class MusyawarahController extends Controller
 
     public function destroy(Musyawarah $musyawarah): JsonResponse
     {
+        $this->ensureSuperAdmin();
+
         if ($musyawarah->status === 'selesai') {
             throw ValidationException::withMessages([
                 'status' => 'Musyawarah yang sudah selesai tidak dapat dihapus.',
@@ -99,6 +111,8 @@ class MusyawarahController extends Controller
 
     public function selesai(Musyawarah $musyawarah): JsonResponse
     {
+        $this->ensureSuperAdmin();
+
         if ($musyawarah->status === 'selesai') {
             throw ValidationException::withMessages([
                 'status' => 'Musyawarah ini sudah ditutup.',
@@ -111,6 +125,8 @@ class MusyawarahController extends Controller
 
     public function regenerate(Musyawarah $musyawarah): JsonResponse
     {
+        $this->ensureSuperAdmin();
+
         $this->service->generate($musyawarah);
 
         return response()->json([
@@ -122,6 +138,8 @@ class MusyawarahController extends Controller
 
     public function laporanIndex(Musyawarah $musyawarah): JsonResponse
     {
+        $this->ensureSuperAdmin();
+
         $laporan  = $musyawarah->laporan()->with('kelas.kelasGuru.pengajar.user')->get();
         $evaluasi = $this->service->getEvaluasi($musyawarah);
 
@@ -141,6 +159,7 @@ class MusyawarahController extends Controller
 
     public function laporanRegenerate(Musyawarah $musyawarah, LaporanMusyawarah $laporan): JsonResponse
     {
+        $this->ensureSuperAdmin();
         abort_if($laporan->musyawarah_id !== $musyawarah->id, 404);
 
         $laporan = $this->service->regenerateKelas($laporan);
@@ -151,6 +170,8 @@ class MusyawarahController extends Controller
 
     public function notulensiIndex(Musyawarah $musyawarah): JsonResponse
     {
+        $this->ensureSuperAdmin();
+
         return response()->json([
             'data' => $musyawarah->notulensi()->orderBy('created_at')->get(),
         ]);
@@ -172,6 +193,7 @@ class MusyawarahController extends Controller
 
     public function notulensiDestroy(Musyawarah $musyawarah, NotulensiMusyawarah $notulensi): JsonResponse
     {
+        $this->ensureSuperAdmin();
         abort_if($notulensi->musyawarah_id !== $musyawarah->id, 404);
 
         $notulensi->delete();

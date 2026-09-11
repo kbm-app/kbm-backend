@@ -15,6 +15,8 @@ class PengajarController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Pengajar::class);
+
         $query = Pengajar::with('user')
             ->when($request->search, fn($q) => $q->whereHas('user', fn($u) => $u->where('name', 'like', "%{$request->search}%")))
             ->when($request->has('is_aktif'), fn($q) => $q->where('is_aktif', $request->boolean('is_aktif')));
@@ -30,6 +32,8 @@ class PengajarController extends Controller
 
     public function show(Pengajar $pengajar): JsonResponse
     {
+        $this->authorize('view', $pengajar);
+
         return response()->json(['pengajar' => $pengajar->load('user')]);
     }
 
@@ -67,6 +71,8 @@ class PengajarController extends Controller
 
     public function toggleAktif(Pengajar $pengajar): JsonResponse
     {
+        $this->authorize('toggleAktif', $pengajar);
+
         $pengajar->update(['is_aktif' => !$pengajar->is_aktif]);
         return response()->json(['pengajar' => $pengajar->load('user')]);
     }

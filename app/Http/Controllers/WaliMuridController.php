@@ -7,11 +7,14 @@ use App\Http\Requests\WaliMurid\UpdateWaliMuridRequest;
 use App\Models\Murid;
 use App\Models\WaliMurid;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class WaliMuridController extends Controller
 {
     public function index(Murid $murid): JsonResponse
     {
+        $this->authorize('view', $murid);
+
         return response()->json(['wali' => $murid->waliMurid]);
     }
 
@@ -27,8 +30,10 @@ class WaliMuridController extends Controller
         return response()->json(['wali' => $waliMurid]);
     }
 
-    public function destroy(WaliMurid $waliMurid): JsonResponse
+    public function destroy(Request $request, WaliMurid $waliMurid): JsonResponse
     {
+        abort_unless($request->user()->role->value === 'super_admin', 403);
+
         $waliMurid->delete();
         return response()->json(null, 204);
     }

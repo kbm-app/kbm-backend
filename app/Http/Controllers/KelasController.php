@@ -22,6 +22,8 @@ class KelasController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Kelas::class);
+
         $user = $request->user();
 
         $query = Kelas::withCount(['muridAktif as murid_aktif_count'])
