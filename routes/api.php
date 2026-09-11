@@ -45,6 +45,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('users', UserController::class);
     Route::put('users/{user}/toggle', [UserController::class, 'toggleActive']);
+    Route::post('users/{user}/send-reset-link', [UserController::class, 'sendResetLink']);
 
     Route::apiResource('pengajar', PengajarController::class);
     Route::get('pengajar/{pengajar}/dampak-hapus', [PengajarController::class, 'deleteImpact']);

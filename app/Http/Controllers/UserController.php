@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\UserRole;
+use App\Mail\ResetPasswordMail;
 use App\Mail\SetPasswordMail;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -97,5 +98,15 @@ class UserController extends Controller
         $user->update(['is_active' => ! $user->is_active]);
 
         return response()->json(['user' => $user->fresh()]);
+    }
+
+    public function sendResetLink(User $user): JsonResponse
+    {
+        $this->authorize('sendResetLink', $user);
+
+        $token = Password::broker()->createToken($user);
+        Mail::to($user)->send(new ResetPasswordMail($user, $token));
+
+        return response()->json(['message' => 'Email reset password berhasil dikirim.']);
     }
 }

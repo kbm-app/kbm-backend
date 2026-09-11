@@ -31,4 +31,9 @@ class UserPolicy
     {
         return $user->role === UserRole::SuperAdmin && $user->id !== $model->id;
     }
+
+    public function sendResetLink(User $user, User $model): bool
+    {
+        return $user->role === UserRole::SuperAdmin && $user->id !== $model->id;
+    }
 }
