@@ -18,7 +18,7 @@ class MuridExport implements FromCollection, WithHeadings, WithStyles, ShouldAut
     public function collection(): Collection
     {
         $query = Murid::with(['waliMurid', 'kelasAktif.kelas'])
-            ->when($this->filters['search'] ?? null, fn ($q, $v) => $q->where('nama', 'like', "%{$v}%"))
+            ->when($this->filters['search'] ?? null, fn ($q, $v) => $q->where('nama', 'ilike', "%{$v}%"))
             ->when($this->filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
             ->when($this->filters['kelas_id'] ?? null, fn ($q, $v) =>
                 $q->whereHas('kelasAktif', fn ($k) => $k->where('kelas_id', $v))

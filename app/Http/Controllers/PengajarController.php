@@ -18,7 +18,7 @@ class PengajarController extends Controller
         $this->authorize('viewAny', Pengajar::class);
 
         $query = Pengajar::with('user')
-            ->when($request->search, fn($q) => $q->whereHas('user', fn($u) => $u->where('name', 'like', "%{$request->search}%")))
+            ->when($request->search, fn($q) => $q->whereHas('user', fn($u) => $u->where('name', 'ilike', "%{$request->search}%")))
             ->when($request->has('is_aktif'), fn($q) => $q->where('is_aktif', $request->boolean('is_aktif')));
 
         return response()->json($query->paginate(15));

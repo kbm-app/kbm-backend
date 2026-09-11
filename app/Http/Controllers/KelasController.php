@@ -30,7 +30,7 @@ class KelasController extends Controller
             ->with([
                 'kelasGuru' => fn($q) => $q->where('peran', 'utama')->with('pengajar.user'),
             ])
-            ->when($request->search, fn($q) => $q->where('nama', 'like', "%{$request->search}%"))
+            ->when($request->search, fn($q) => $q->where('nama', 'ilike', "%{$request->search}%"))
             ->when($request->has('is_aktif'), fn($q) => $q->where('is_aktif', $request->boolean('is_aktif')));
 
         // Pengajar hanya melihat kelas yang diajar

@@ -29,7 +29,7 @@ class ProgramExport implements FromCollection, WithHeadings, WithStyles, ShouldA
     {
         $rows = Program::query()
             ->when($this->filters['search'] ?? null, fn ($q, $v) =>
-                $q->where('nama', 'like', "%{$v}%")
+                $q->where('nama', 'ilike', "%{$v}%")
             )
             ->when(isset($this->filters['is_aktif']), fn ($q) =>
                 $q->where('is_aktif', filter_var($this->filters['is_aktif'], FILTER_VALIDATE_BOOLEAN))

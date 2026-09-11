@@ -18,7 +18,7 @@ class MuridController extends Controller
         $this->authorize('viewAny', Murid::class);
 
         $query = Murid::with(['waliMurid', 'kelasAktif.kelas'])
-            ->when($request->search, fn($q) => $q->where('nama', 'like', "%{$request->search}%"))
+            ->when($request->search, fn($q) => $q->where('nama', 'ilike', "%{$request->search}%"))
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->boolean('tanpa_kelas'), fn($q) => $q->whereDoesntHave('kelasAktif'))
             ->when($request->kelas_id, fn($q) => $q->whereHas('kelasAktif', fn($k) => $k->where('kelas_id', $request->kelas_id)))

@@ -19,7 +19,7 @@ class ProgramController extends Controller
         $query = Program::withCount(['programKelas as jumlah_kelas'])
             ->when($request->jenis, fn ($q) => $q->where('jenis', $request->jenis))
             ->when($request->has('is_aktif'), fn ($q) => $q->where('is_aktif', $request->boolean('is_aktif')))
-            ->when($request->search, fn ($q) => $q->where('nama', 'like', "%{$request->search}%"));
+            ->when($request->search, fn ($q) => $q->where('nama', 'ilike', "%{$request->search}%"));
 
         return response()->json($query->orderBy('nama')->paginate(20));
     }

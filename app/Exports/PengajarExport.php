@@ -19,7 +19,7 @@ class PengajarExport implements FromCollection, WithHeadings, WithStyles, Should
     {
         $query = Pengajar::with('user')
             ->when($this->filters['search'] ?? null, fn ($q, $v) =>
-                $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$v}%"))
+                $q->whereHas('user', fn ($u) => $u->where('name', 'ilike', "%{$v}%"))
             )
             ->when(isset($this->filters['is_aktif']), fn ($q) =>
                 $q->where('is_aktif', filter_var($this->filters['is_aktif'], FILTER_VALIDATE_BOOLEAN))

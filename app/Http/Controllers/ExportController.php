@@ -48,7 +48,7 @@ class ExportController extends Controller
         $filterLabel = $this->buildMuridFilterLabel($filters);
 
         $murid = Murid::with(['waliMurid', 'kelasAktif.kelas'])
-            ->when($filters['search'] ?? null, fn ($q, $v) => $q->where('nama', 'like', "%{$v}%"))
+            ->when($filters['search'] ?? null, fn ($q, $v) => $q->where('nama', 'ilike', "%{$v}%"))
             ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
             ->when($filters['kelas_id'] ?? null, fn ($q, $v) =>
                 $q->whereHas('kelasAktif', fn ($k) => $k->where('kelas_id', $v))
@@ -102,7 +102,7 @@ class ExportController extends Controller
 
         $pengajar = Pengajar::with('user')
             ->when($filters['search'] ?? null, fn ($q, $v) =>
-                $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$v}%"))
+                $q->whereHas('user', fn ($u) => $u->where('name', 'ilike', "%{$v}%"))
             )
             ->when(isset($filters['is_aktif']), fn ($q) =>
                 $q->where('is_aktif', filter_var($filters['is_aktif'], FILTER_VALIDATE_BOOLEAN))
