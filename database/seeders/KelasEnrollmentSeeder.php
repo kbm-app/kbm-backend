@@ -14,7 +14,7 @@ class KelasEnrollmentSeeder extends Seeder
 {
     public function run(): void
     {
-        $ta = '2025/2026';
+        $ta = '2026/2027';
 
         $this->assignPengajar($ta);
         $this->enrollMurid($ta);

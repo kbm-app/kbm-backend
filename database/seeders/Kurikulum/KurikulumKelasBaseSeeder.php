@@ -10,7 +10,7 @@ use Illuminate\Database\Seeder;
 
 abstract class KurikulumKelasBaseSeeder extends Seeder
 {
-    protected const TA = '2025/2026';
+    protected const TA = '2026/2027';
 
     abstract protected function kelasNama(): string;
     abstract protected function kurikulumNama(): string;

@@ -10,7 +10,7 @@ use Illuminate\Database\Seeder;
 
 class JadwalSeeder extends Seeder
 {
-    private const TA = '2025/2026';
+    private const TA = '2026/2027';
 
     public function run(): void
     {

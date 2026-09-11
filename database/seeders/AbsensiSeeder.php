@@ -18,7 +18,7 @@ use Illuminate\Support\Collection;
 
 class AbsensiSeeder extends Seeder
 {
-    private const TA = '2025/2026';
+    private const TA = '2026/2027';
 
     public function run(): void
     {

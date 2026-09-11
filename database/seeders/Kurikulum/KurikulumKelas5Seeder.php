@@ -208,7 +208,7 @@ class KurikulumKelas5Seeder extends KurikulumKelasBaseSeeder
             $this->bulan('juni',
                 umum: [
                     ['I',   'Tata Krama',  'Evaluasi akhir tahun — muhasabah menyeluruh'],
-                    ['II',  'Keilmuan',    'Review seluruh materi Alim Faqih TA 2025/2026'],
+                    ['II',  'Keilmuan',    'Review seluruh materi Alim Faqih TA 2026/2027'],
                     ['III', 'Kemandirian', 'Presentasi proyek kemandirian tahunan'],
                 ],
                 individu: [

@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 
 class ProgressMateriMuridSeeder extends Seeder
 {
-    private const TA = '2025/2026';
+    private const TA = '2026/2027';
 
     /**
      * Tingkat penyelesaian realistis per bulan (Juli 2025–Juni 2026).
