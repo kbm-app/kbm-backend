@@ -17,6 +17,8 @@
     <p>Atau salin tautan berikut ke browser Anda:</p>
     <p><a href="{{ $resetUrl }}">{{ $resetUrl }}</a></p>
 
+    <p style="color: #6b7280; font-size: 14px;">Tautan ini berlaku selama 60 menit sejak email ini dikirim. Jika Anda (atau admin) meminta tautan baru sebelum tautan ini digunakan, tautan lama tidak akan berlaku lagi — gunakan email terbaru yang Anda terima.</p>
+
     <p>Jika Anda tidak merasa meminta reset password ini, abaikan email ini dan password Anda tidak akan berubah.</p>
 </body>
 </html>

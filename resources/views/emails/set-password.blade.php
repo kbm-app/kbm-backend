@@ -17,6 +17,8 @@
     <p>Atau salin tautan berikut ke browser Anda:</p>
     <p><a href="{{ $setPasswordUrl }}">{{ $setPasswordUrl }}</a></p>
 
+    <p style="color: #6b7280; font-size: 14px;">Tautan ini berlaku selama 60 menit sejak email ini dikirim. Jika Anda meminta tautan baru sebelum tautan ini digunakan, tautan lama tidak akan berlaku lagi — gunakan email terbaru yang Anda terima.</p>
+
     <p>Jika Anda tidak merasa meminta akun ini, abaikan email ini.</p>
 </body>
 </html>
