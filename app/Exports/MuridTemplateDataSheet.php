@@ -15,13 +15,13 @@ class MuridTemplateDataSheet implements FromArray, WithHeadings, WithStyles, Sho
     public function array(): array
     {
         return [
-            ['Ahmad Fauzi', 'L', '2015-03-12', '2023-07-17', 'Jl. Mawar No. 5, Jakarta', 'Budi Santoso', 'ayah', '081234567890'],
+            ['Ahmad Fauzi', 'Jakarta', 'L', '2015-03-12', '2023-07-17', 'Jl. Mawar No. 5, Jakarta', 'Budi Santoso', 'ayah', '081234567890'],
         ];
     }
 
     public function headings(): array
     {
-        return ['nama*', 'jenis_kelamin*', 'tanggal_lahir*', 'tanggal_masuk', 'alamat', 'nama_wali', 'hubungan_wali', 'hp_wali'];
+        return ['nama*', 'tempat_lahir', 'jenis_kelamin*', 'tanggal_lahir*', 'tanggal_masuk', 'alamat', 'nama_wali', 'hubungan_wali', 'hp_wali'];
     }
 
     public function styles(Worksheet $sheet): array

@@ -18,6 +18,7 @@ class Murid extends Model
     protected $fillable = [
         'user_id',
         'nama',
+        'tempat_lahir',
         'jenis_kelamin',
         'tanggal_lahir',
         'alamat',

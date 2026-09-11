@@ -19,8 +19,9 @@ class StoreWaliMuridRequest extends FormRequest
     {
         return [
             'nama'       => ['required', 'string', 'max:100'],
-            'hubungan'   => ['required', 'in:ayah,ibu,kakak,wali_lain'],
-            'phone'      => ['required', 'string', 'max:20'],
+            'hubungan'   => ['required', 'in:ayah,ibu,kakak,nenek,kakek,wali_lain'],
+            'phones'     => ['required', 'array', 'min:1'],
+            'phones.*'   => ['required', 'string', 'max:20'],
             'pekerjaan'  => ['nullable', 'string', 'max:100'],
             'is_primary' => ['boolean'],
         ];

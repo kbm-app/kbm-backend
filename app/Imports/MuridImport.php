@@ -37,6 +37,7 @@ class MuridImport implements ToCollection, WithHeadingRow
 
             $murid = Murid::create([
                 'nama'          => trim($row['nama']),
+                'tempat_lahir'  => $row['tempat_lahir'] ? trim($row['tempat_lahir']) : null,
                 'jenis_kelamin' => strtoupper(substr(trim($row['jenis_kelamin']), 0, 1)),
                 'tanggal_lahir' => Carbon::parse($row['tanggal_lahir']),
                 'tanggal_masuk' => $row['tanggal_masuk'] ? Carbon::parse($row['tanggal_masuk']) : null,
@@ -46,15 +47,20 @@ class MuridImport implements ToCollection, WithHeadingRow
 
             if (!empty($row['nama_wali'])) {
                 $hubungan = strtolower(trim($row['hubungan_wali'] ?? 'wali_lain'));
-                if (!in_array($hubungan, ['ayah', 'ibu', 'kakak', 'wali_lain'])) {
+                if (!in_array($hubungan, ['ayah', 'ibu', 'kakak', 'nenek', 'kakek', 'wali_lain'])) {
                     $hubungan = 'wali_lain';
                 }
+
+                $phones = array_values(array_filter(array_map(
+                    'trim',
+                    explode(',', $row['hp_wali'] ?? '')
+                )));
 
                 WaliMurid::create([
                     'murid_id'   => $murid->id,
                     'nama'       => trim($row['nama_wali']),
                     'hubungan'   => $hubungan,
-                    'phone'      => trim($row['hp_wali'] ?? ''),
+                    'phones'     => $phones ?: [''],
                     'is_primary' => true,
                 ]);
             }

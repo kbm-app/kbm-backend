@@ -19,6 +19,7 @@ class UpdateMuridRequest extends FormRequest
     {
         return [
             'nama'          => ['required', 'string', 'max:100'],
+            'tempat_lahir'  => ['nullable', 'string', 'max:100'],
             'jenis_kelamin' => ['required', 'in:L,P'],
             'tanggal_lahir' => ['required', 'date'],
             'alamat'        => ['nullable', 'string'],

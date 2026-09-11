@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -14,7 +15,7 @@ class WaliMurid extends Model
         'murid_id',
         'nama',
         'hubungan',
-        'phone',
+        'phones',
         'pekerjaan',
         'is_primary',
     ];
@@ -22,8 +23,17 @@ class WaliMurid extends Model
     protected function casts(): array
     {
         return [
+            'phones'     => 'array',
             'is_primary' => 'boolean',
         ];
+    }
+
+    /** Nomor HP utama (elemen pertama dari `phones`), untuk kode yang masih butuh satu nomor. */
+    protected function phone(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->phones[0] ?? null,
+        );
     }
 
     public function user(): BelongsTo

@@ -22,6 +22,7 @@ class MuridService
 
             $murid = Murid::create([
                 'nama'          => $data['nama'],
+                'tempat_lahir'  => $data['tempat_lahir'] ?? null,
                 'jenis_kelamin' => $data['jenis_kelamin'],
                 'tanggal_lahir' => $data['tanggal_lahir'],
                 'alamat'        => $data['alamat'] ?? null,

@@ -41,13 +41,14 @@ class MuridExport implements FromCollection, WithHeadings, WithStyles, ShouldAut
             return [
                 'no'             => $index + 1,
                 'nama'           => $murid->nama,
+                'tempat_lahir'   => $murid->tempat_lahir ?? '',
                 'jenis_kelamin'  => $murid->jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
                 'tanggal_lahir'  => $murid->tanggal_lahir?->format('d/m/Y') ?? '',
                 'tanggal_masuk'  => $murid->tanggal_masuk?->format('d/m/Y') ?? '',
                 'kelas'          => $kelasNama,
                 'status'         => ucfirst($murid->status),
                 'nama_wali'      => $waliUtama?->nama ?? '',
-                'hp_wali'        => $waliUtama?->phone ?? '',
+                'hp_wali'        => $waliUtama ? implode(', ', $waliUtama->phones) : '',
                 'alamat'         => $murid->alamat ?? '',
             ];
         });
@@ -55,7 +56,7 @@ class MuridExport implements FromCollection, WithHeadings, WithStyles, ShouldAut
 
     public function headings(): array
     {
-        return ['No', 'Nama', 'Jenis Kelamin', 'Tanggal Lahir', 'Tanggal Masuk',
+        return ['No', 'Nama', 'Tempat Lahir', 'Jenis Kelamin', 'Tanggal Lahir', 'Tanggal Masuk',
                 'Kelas', 'Status', 'Nama Wali', 'No. HP Wali', 'Alamat'];
     }
 
