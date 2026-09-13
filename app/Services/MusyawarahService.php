@@ -79,12 +79,16 @@ class MusyawarahService
             return null;
         }
 
+        $hadirPerMurid = AbsensiMurid::whereIn('pertemuan_id', $pertemuanIds)
+            ->whereIn('murid_id', $muridIds)
+            ->whereIn('status', ['hadir', 'terlambat'])
+            ->selectRaw('murid_id, count(*) as total')
+            ->groupBy('murid_id')
+            ->pluck('total', 'murid_id');
+
         $totalPersen = 0;
         foreach ($muridIds as $muridId) {
-            $hadir = AbsensiMurid::whereIn('pertemuan_id', $pertemuanIds)
-                ->where('murid_id', $muridId)
-                ->whereIn('status', ['hadir', 'terlambat'])
-                ->count();
+            $hadir = $hadirPerMurid->get($muridId, 0);
             $totalPersen += ($hadir / $totalPertemuan) * 100;
         }
 
@@ -176,12 +180,15 @@ class MusyawarahService
             ->whereNull('tanggal_keluar')
             ->get();
 
+        $absensiPerMurid = AbsensiMurid::whereIn('pertemuan_id', $pertemuanIds)
+            ->whereIn('murid_id', $muridAktif->pluck('murid_id'))
+            ->get()
+            ->groupBy('murid_id');
+
         $muridBermasalah = [];
 
         foreach ($muridAktif as $mk) {
-            $absensi = AbsensiMurid::whereIn('pertemuan_id', $pertemuanIds)
-                ->where('murid_id', $mk->murid_id)
-                ->get();
+            $absensi = $absensiPerMurid->get($mk->murid_id, collect());
 
             $hadir  = $absensi->whereIn('status', ['hadir', 'terlambat'])->count();
             $alpha  = $absensi->where('status', 'alpha')->count();
@@ -217,12 +224,11 @@ class MusyawarahService
             return ['per_kelas' => [], 'notulensi_open' => []];
         }
 
-        $laporanLalu = $sebelumnya->laporan()->with('kelas')->get()->keyBy('kelas_id');
-        $laporanIni  = $musyawarah->laporan()->pluck('snapshot_kehadiran_persen', 'kelas_id')
-            ->merge($musyawarah->laporan()->pluck('snapshot_progress_persen', 'kelas_id'));
+        $laporanLalu       = $sebelumnya->laporan()->with('kelas')->get();
+        $laporanIniByKelas = $musyawarah->laporan()->get()->keyBy('kelas_id');
 
-        $perKelas = $sebelumnya->laporan()->with('kelas')->get()->map(function ($ll) use ($musyawarah) {
-            $ini = $musyawarah->laporan()->where('kelas_id', $ll->kelas_id)->first();
+        $perKelas = $laporanLalu->map(function ($ll) use ($laporanIniByKelas) {
+            $ini = $laporanIniByKelas->get($ll->kelas_id);
 
             return [
                 'kelas_id'        => $ll->kelas_id,

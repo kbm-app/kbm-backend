@@ -103,9 +103,11 @@ class KasTransaksiController extends Controller
 
         $kelasList = $query->orderBy('nama')->get();
 
+        $saldoPerKelas = $this->service->hitungSaldoBanyakKelas($kelasList->pluck('id'), $bulan, $tahun);
+
         $data = $kelasList->map(fn ($kelas) => [
             'kelas' => ['id' => $kelas->id, 'nama' => $kelas->nama],
-            ...$this->service->hitungSaldo($kelas->id, $bulan, $tahun),
+            ...$saldoPerKelas[$kelas->id],
         ]);
 
         return response()->json(['data' => $data, 'bulan' => $bulan, 'tahun' => $tahun]);

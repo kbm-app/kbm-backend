@@ -71,37 +71,46 @@ class KelasService
             ->aktif()
             ->pluck('murid_id');
 
-        $now = now();
+        $tercatatPerPertemuan = AbsensiMurid::whereIn('pertemuan_id', $pertemuanIds)
+            ->get(['pertemuan_id', 'murid_id'])
+            ->groupBy('pertemuan_id');
+
+        $now  = now();
+        $rows = [];
 
         foreach ($pertemuanIds as $pertemuanId) {
-            $muridBelumTercatat = $muridIds->diff(
-                AbsensiMurid::where('pertemuan_id', $pertemuanId)->pluck('murid_id')
-            );
+            $tercatatIds        = $tercatatPerPertemuan->get($pertemuanId, collect())->pluck('murid_id');
+            $muridBelumTercatat = $muridIds->diff($tercatatIds);
 
-            if ($muridBelumTercatat->isEmpty()) {
-                continue;
+            foreach ($muridBelumTercatat as $muridId) {
+                $rows[] = [
+                    'pertemuan_id' => $pertemuanId,
+                    'murid_id'     => $muridId,
+                    'status'       => 'alpha',
+                    'dicatat_oleh' => null,
+                    'created_at'   => $now,
+                    'updated_at'   => $now,
+                ];
             }
+        }
 
-            AbsensiMurid::insert($muridBelumTercatat->map(fn ($muridId) => [
-                'pertemuan_id' => $pertemuanId,
-                'murid_id'     => $muridId,
-                'status'       => 'alpha',
-                'dicatat_oleh' => null,
-                'created_at'   => $now,
-                'updated_at'   => $now,
-            ])->values()->all());
+        if (!empty($rows)) {
+            AbsensiMurid::insert($rows);
         }
     }
 
     public function naikKelas(Kelas $asal, Kelas $tujuan, array $muridIds): void
     {
         DB::transaction(function () use ($asal, $tujuan, $muridIds) {
+            $existing = MuridKelas::where('kelas_id', $asal->id)
+                ->where('status', 'aktif')
+                ->whereNull('tanggal_keluar')
+                ->whereIn('murid_id', $muridIds)
+                ->get()
+                ->keyBy('murid_id');
+
             foreach ($muridIds as $muridId) {
-                $mk = MuridKelas::where('murid_id', $muridId)
-                    ->where('kelas_id', $asal->id)
-                    ->where('status', 'aktif')
-                    ->whereNull('tanggal_keluar')
-                    ->first();
+                $mk = $existing->get($muridId);
 
                 if (!$mk) {
                     continue;

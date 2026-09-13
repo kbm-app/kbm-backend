@@ -82,7 +82,7 @@ class PengumumanService
             return collect();
         }
 
-        $kelas = Kelas::with(['murid.waliMurid.user', 'pengajar.user'])->find($kelasId);
+        $kelas = Kelas::with(['muridAktif.murid.waliMurid.user', 'kelasGuru.pengajar.user'])->find($kelasId);
         if (! $kelas) {
             return collect();
         }
@@ -90,17 +90,17 @@ class PengumumanService
         $userIds = collect();
 
         // wali murid primary dari setiap murid aktif di kelas
-        foreach ($kelas->murid as $murid) {
-            $wali = $murid->waliMurid->where('is_primary', true)->first();
+        foreach ($kelas->muridAktif as $muridKelas) {
+            $wali = $muridKelas->murid->waliMurid->where('is_primary', true)->first();
             if ($wali?->user_id) {
                 $userIds->push($wali->user_id);
             }
         }
 
         // pengajar yang mengajar di kelas ini
-        foreach ($kelas->pengajar as $pengajar) {
-            if ($pengajar->user_id) {
-                $userIds->push($pengajar->user_id);
+        foreach ($kelas->kelasGuru as $kelasGuru) {
+            if ($kelasGuru->pengajar?->user_id) {
+                $userIds->push($kelasGuru->pengajar->user_id);
             }
         }
 

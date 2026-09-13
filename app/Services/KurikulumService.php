@@ -109,17 +109,19 @@ class KurikulumService
             ->distinct('materi_id')
             ->count('materi_id');
 
+        $materiSelesaiIds = ProgressMateriMurid::whereIn('materi_id', $materiIds)
+            ->where('status', 'selesai')
+            ->pluck('materi_id')
+            ->unique();
+
         $perBab = Materi::whereIn('id', $materiIds)
             ->with('bab:id,kode,nama')
             ->get()
             ->groupBy('bab_kurikulum_id')
-            ->map(function ($items) {
+            ->map(function ($items) use ($materiSelesaiIds) {
                 $bab    = $items->first()->bab;
                 $ids    = $items->pluck('id');
-                $done   = ProgressMateriMurid::whereIn('materi_id', $ids)
-                    ->where('status', 'selesai')
-                    ->distinct('materi_id')
-                    ->count('materi_id');
+                $done   = $ids->intersect($materiSelesaiIds)->count();
 
                 return [
                     'bab'    => $bab?->kode . ' - ' . $bab?->nama,
