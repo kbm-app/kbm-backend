@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <style>
-  @page { margin: 15mm 18mm; }
+  @page { margin: 15mm 18mm 24mm 18mm; }
   * { box-sizing: border-box; }
   body, h1, h2 { margin: 0; padding: 0; }
   body { font-family: 'DejaVu Sans', sans-serif; font-size: 10px; color: #1e293b; }
@@ -24,17 +24,37 @@
   tbody tr:nth-child(odd) { background-color: #ffffff; }
   tbody td { padding: 5px 7px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
 
+  .wali-line { margin-bottom: 4px; }
+  .wali-line:last-child { margin-bottom: 0; }
+  .wali-empty { color: #94a3b8; }
+
   .badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 8px; font-weight: 600; }
   .badge-aktif     { background: #dcfce7; color: #166534; }
   .badge-nonaktif  { background: #fee2e2; color: #991b1b; }
   .badge-alumni    { background: #dbeafe; color: #1e40af; }
   .badge-pindah    { background: #fef9c3; color: #854d0e; }
 
-  .footer { position: fixed; bottom: 0; width: 100%; border-top: 1px solid #e2e8f0; padding-top: 5px; display: flex; justify-content: space-between; font-size: 8px; color: #94a3b8; }
+  .footer { position: fixed; bottom: -14mm; width: 100%; border-top: 1px solid #e2e8f0; padding-top: 5px; display: flex; justify-content: space-between; font-size: 8px; color: #94a3b8; }
   .page-number:after { content: counter(page) " / " counter(pages); }
 </style>
 </head>
 <body>
+
+@php
+  $hubunganLabel = [
+    'ayah'      => 'Ayah',
+    'ibu'       => 'Ibu',
+    'kakak'     => 'Kakak',
+    'nenek'     => 'Nenek',
+    'kakek'     => 'Kakek',
+    'wali_lain' => 'Wali Lain',
+  ];
+
+  $isValidPhone = function ($phone) {
+      $digits = preg_replace('/\D/', '', (string) $phone);
+      return (bool) preg_match('/^(0|62)8[0-9]{7,12}$/', $digits);
+  };
+@endphp
 
 <div class="header">
   <h1>DAFTAR MURID</h1>
@@ -59,13 +79,13 @@
     <tr>
       <th style="width:28px">No</th>
       <th>Nama</th>
-      <th style="width:40px">JK</th>
+      <th style="width:70px">Jenis Kelamin</th>
       <th style="width:65px">Tgl Lahir</th>
-      <th style="width:65px">Tgl Masuk</th>
       <th>Kelas</th>
       <th style="width:48px">Status</th>
       <th>Nama Wali</th>
       <th>No. HP Wali</th>
+      <th>Pekerjaan Wali</th>
     </tr>
   </thead>
   <tbody>
@@ -73,15 +93,38 @@
     <tr>
       <td>{{ $i + 1 }}</td>
       <td>{{ $m->nama }}</td>
-      <td>{{ $m->jenis_kelamin }}</td>
+      <td>{{ $m->jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan' }}</td>
       <td>{{ $m->tanggal_lahir?->format('d/m/Y') }}</td>
-      <td>{{ $m->tanggal_masuk?->format('d/m/Y') ?? '-' }}</td>
       <td>{{ $m->kelasAktif->map(fn($mk) => $mk->kelas->nama)->join(', ') ?: '-' }}</td>
       <td>
         <span class="badge badge-{{ $m->status }}">{{ ucfirst($m->status) }}</span>
       </td>
-      <td>{{ $m->waliUtama?->nama ?? '-' }}</td>
-      <td>{{ $m->waliUtama?->phone ?? '-' }}</td>
+      <td>
+        @forelse($m->waliMurid as $wali)
+          <div class="wali-line">{{ $wali->nama }} ({{ $hubunganLabel[$wali->hubungan] ?? $wali->hubungan }})</div>
+        @empty
+          <span class="wali-empty">-</span>
+        @endforelse
+      </td>
+      <td>
+        @forelse($m->waliMurid as $wali)
+          @php
+            $validPhones = collect($wali->phones ?? [])->filter($isValidPhone)->values();
+          @endphp
+          <div class="wali-line">
+            {{ $validPhones->isNotEmpty() ? $validPhones->join(', ') : 'Tidak memiliki nomor HP' }}
+          </div>
+        @empty
+          <span class="wali-empty">-</span>
+        @endforelse
+      </td>
+      <td>
+        @forelse($m->waliMurid as $wali)
+          <div class="wali-line">{{ $wali->pekerjaan ?: '-' }}</div>
+        @empty
+          <span class="wali-empty">-</span>
+        @endforelse
+      </td>
     </tr>
     @empty
     <tr>

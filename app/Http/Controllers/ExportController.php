@@ -62,7 +62,7 @@ class ExportController extends Controller
             ->orderBy('nama')
             ->get()
             ->each(function (Murid $m) {
-                $m->waliUtama = $m->waliMurid->firstWhere('is_primary', true) ?? $m->waliMurid->first();
+                $m->waliMurid = $m->waliMurid->sortByDesc('is_primary')->values();
             });
 
         $pdf = Pdf::loadView('pdf.murid-list', [
