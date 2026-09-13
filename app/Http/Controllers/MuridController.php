@@ -25,7 +25,18 @@ class MuridController extends Controller
             ->when($request->usia_min, fn($q) => $q->whereRaw("DATE_PART('year', AGE(CURRENT_DATE, tanggal_lahir)) >= ?", [$request->usia_min]))
             ->when($request->usia_max, fn($q) => $q->whereRaw("DATE_PART('year', AGE(CURRENT_DATE, tanggal_lahir)) <= ?", [$request->usia_max]));
 
-        return response()->json($query->paginate(15));
+        $jenisKelaminCount = (clone $query)
+            ->without(['waliMurid', 'kelasAktif.kelas'])
+            ->selectRaw('jenis_kelamin, count(*) as total')
+            ->groupBy('jenis_kelamin')
+            ->pluck('total', 'jenis_kelamin');
+
+        return response()->json(array_merge($query->paginate(15)->toArray(), [
+            'jenis_kelamin_summary' => [
+                'laki_laki' => (int) ($jenisKelaminCount['L'] ?? 0),
+                'perempuan' => (int) ($jenisKelaminCount['P'] ?? 0),
+            ],
+        ]));
     }
 
     public function store(StoreMuridRequest $request): JsonResponse
