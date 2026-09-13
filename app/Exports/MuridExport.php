@@ -21,7 +21,7 @@ class MuridExport implements FromCollection, WithHeadings, WithStyles, ShouldAut
             ->when($this->filters['search'] ?? null, fn ($q, $v) => $q->where('nama', 'ilike', "%{$v}%"))
             ->when($this->filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
             ->when($this->filters['kelas_id'] ?? null, fn ($q, $v) =>
-                $q->whereHas('kelasAktif', fn ($k) => $k->where('kelas_id', $v))
+                $q->whereHas('kelasAktif', fn ($k) => $k->whereIn('kelas_id', (array) $v))
             )
             ->when($this->filters['usia_min'] ?? null, fn ($q, $v) =>
                 $q->whereRaw("DATE_PART('year', AGE(CURRENT_DATE, tanggal_lahir)) >= ?", [$v])

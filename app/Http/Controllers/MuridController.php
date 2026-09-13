@@ -21,7 +21,7 @@ class MuridController extends Controller
             ->when($request->search, fn($q) => $q->where('nama', 'ilike', "%{$request->search}%"))
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->boolean('tanpa_kelas'), fn($q) => $q->whereDoesntHave('kelasAktif'))
-            ->when($request->kelas_id, fn($q) => $q->whereHas('kelasAktif', fn($k) => $k->where('kelas_id', $request->kelas_id)))
+            ->when($request->kelas_id, fn($q, $v) => $q->whereHas('kelasAktif', fn($k) => $k->whereIn('kelas_id', (array) $v)))
             ->when($request->usia_min, fn($q) => $q->whereRaw("DATE_PART('year', AGE(CURRENT_DATE, tanggal_lahir)) >= ?", [$request->usia_min]))
             ->when($request->usia_max, fn($q) => $q->whereRaw("DATE_PART('year', AGE(CURRENT_DATE, tanggal_lahir)) <= ?", [$request->usia_max]));
 

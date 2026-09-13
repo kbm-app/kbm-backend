@@ -51,7 +51,7 @@ class ExportController extends Controller
             ->when($filters['search'] ?? null, fn ($q, $v) => $q->where('nama', 'ilike', "%{$v}%"))
             ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
             ->when($filters['kelas_id'] ?? null, fn ($q, $v) =>
-                $q->whereHas('kelasAktif', fn ($k) => $k->where('kelas_id', $v))
+                $q->whereHas('kelasAktif', fn ($k) => $k->whereIn('kelas_id', (array) $v))
             )
             ->when($filters['usia_min'] ?? null, fn ($q, $v) =>
                 $q->whereRaw("DATE_PART('year', AGE(CURRENT_DATE, tanggal_lahir)) >= ?", [$v])
@@ -354,9 +354,9 @@ class ExportController extends Controller
             $labels[] = 'Status: ' . ucfirst($filters['status']);
         }
         if (!empty($filters['kelas_id'])) {
-            $kelas = Kelas::find($filters['kelas_id']);
-            if ($kelas) {
-                $labels[] = 'Kelas: ' . $kelas->nama;
+            $kelasNama = Kelas::whereIn('id', (array) $filters['kelas_id'])->pluck('nama');
+            if ($kelasNama->isNotEmpty()) {
+                $labels[] = 'Kelas: ' . $kelasNama->join(', ');
             }
         }
         if (!empty($filters['usia_min']) || !empty($filters['usia_max'])) {
