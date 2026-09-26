@@ -6,12 +6,14 @@ use App\Http\Requests\Kurikulum\DuplikatKurikulumRequest;
 use App\Http\Requests\Kurikulum\StoreKurikulumRequest;
 use App\Http\Requests\Kurikulum\UpdateKurikulumRequest;
 use App\Models\Kelas;
+use App\Models\KelasGuru;
 use App\Models\Kurikulum;
-use App\Models\MuridKelas;
-use App\Models\ProgressMateriMurid;
+use App\Models\PenyampaianMateri;
 use App\Services\KurikulumService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 
 class KurikulumController extends Controller
 {
@@ -25,7 +27,7 @@ class KurikulumController extends Controller
 
         $query = Kurikulum::with(['kelas'])
             ->withCount('materi')
-            ->when($request->kelas_id, fn ($q) => $q->where('kelas_id', $request->kelas_id))
+            ->when($request->kelas_id, fn ($q) => $q->untukKelas((int) $request->kelas_id))
             ->when($request->tahun_ajaran, fn ($q) => $q->where('tahun_ajaran', $request->tahun_ajaran));
 
         if ($user->role->value === 'pengajar') {
@@ -39,11 +41,19 @@ class KurikulumController extends Controller
 
     public function store(StoreKurikulumRequest $request): JsonResponse
     {
-        $kurikulum = Kurikulum::create($request->validated());
+        $data = $request->validated();
+        $this->service->pastikanKelasBelumPunyaKurikulum($data['kelas_ids'], $data['tahun_ajaran']);
+
+        $kurikulum = DB::transaction(function () use ($data) {
+            $kurikulum = Kurikulum::create(Arr::except($data, 'kelas_ids'));
+            $kurikulum->kelas()->sync($data['kelas_ids']);
+            return $kurikulum;
+        });
+
         return response()->json(['kurikulum' => $kurikulum->load('kelas')], 201);
     }
 
-    public function show(Kurikulum $kurikulum): JsonResponse
+    public function show(Request $request, Kurikulum $kurikulum): JsonResponse
     {
         $this->authorize('view', $kurikulum);
 
@@ -52,6 +62,13 @@ class KurikulumController extends Controller
             'bab.materi',
         ]);
 
+        // Kelas pemakai kurikulum yang diajar user ini — dipakai sebagai pilihan awal di tab Progres
+        $kurikulum->setAttribute('kelas_diajar_ids', KelasGuru::whereIn('kelas_id', $kurikulum->kelas->pluck('id'))
+            ->whereHas('pengajar', fn ($q) => $q->where('user_id', $request->user()->id))
+            ->pluck('kelas_id')
+            ->unique()
+            ->values());
+
         return response()->json(['kurikulum' => $kurikulum]);
     }
 
@@ -59,7 +76,20 @@ class KurikulumController extends Controller
     {
         $this->authorize('update', $kurikulum);
 
-        $kurikulum->update($request->validated());
+        $data = $request->validated();
+        $this->service->pastikanKelasBelumPunyaKurikulum(
+            $data['kelas_ids'] ?? $kurikulum->kelas()->pluck('kelas.id')->all(),
+            $data['tahun_ajaran'] ?? $kurikulum->tahun_ajaran,
+            $kurikulum->id,
+        );
+
+        DB::transaction(function () use ($kurikulum, $data) {
+            $kurikulum->update(Arr::except($data, 'kelas_ids'));
+            if (isset($data['kelas_ids'])) {
+                $kurikulum->kelas()->sync($data['kelas_ids']);
+            }
+        });
+
         return response()->json(['kurikulum' => $kurikulum->load('kelas')]);
     }
 
@@ -81,7 +111,7 @@ class KurikulumController extends Controller
 
     public function aktifUntukKelas(Request $request, Kelas $kelas): JsonResponse
     {
-        $kurikulum = Kurikulum::where('kelas_id', $kelas->id)
+        $kurikulum = Kurikulum::untukKelas($kelas->id)
             ->where('tahun_ajaran', $this->currentTahunAjaran())
             ->first();
 
@@ -91,26 +121,19 @@ class KurikulumController extends Controller
 
         $this->authorize('view', $kurikulum);
 
-        $muridIds = MuridKelas::where('kelas_id', $kelas->id)
-            ->where('status', 'aktif')
-            ->whereNull('tanggal_keluar')
-            ->pluck('murid_id');
-
         $materiUmumIds = $kurikulum->materi()->where('tipe', 'umum')->pluck('id');
 
-        $selesaiIds = ProgressMateriMurid::whereIn('murid_id', $muridIds)
+        // Materi umum yang sudah disampaikan di kelas ini
+        $penyampaian = PenyampaianMateri::where('kelas_id', $kelas->id)
             ->whereIn('materi_id', $materiUmumIds)
-            ->where('status', 'selesai')
-            ->pluck('materi_id')
-            ->unique();
+            ->get(['materi_id', 'pertemuan_id', 'metode'])
+            ->keyBy('materi_id');
+        $selesaiIds = $penyampaian->keys();
 
         // Flag per-materi untuk sesi tertentu (opsional — dipakai di detail sesi)
         $pertemuanId     = $request->query('pertemuan_id') ? (int) $request->query('pertemuan_id') : null;
         $dicatatDiSesiIni = $pertemuanId
-            ? ProgressMateriMurid::where('pertemuan_id', $pertemuanId)
-                ->whereIn('materi_id', $materiUmumIds)
-                ->pluck('materi_id')
-                ->unique()
+            ? $penyampaian->where('pertemuan_id', $pertemuanId)->keys()
             : null;
 
         $bab = $kurikulum->bab()
@@ -126,6 +149,7 @@ class KurikulumController extends Controller
                     'judul'               => $m->judul,
                     'sudah_selesai'       => $selesaiIds->contains($m->id),
                     'dicatat_di_sesi_ini' => $dicatatDiSesiIni?->contains($m->id),
+                    'metode'              => $penyampaian->get($m->id)?->metode,
                 ])->values(),
             ])
             ->values();

@@ -3,34 +3,48 @@
 namespace App\Services;
 
 use App\Models\BabKurikulum;
+use App\Models\Kelas;
 use App\Models\Kurikulum;
 use App\Models\Materi;
-use App\Models\MuridKelas;
+use App\Models\PenyampaianMateri;
+use App\Models\Pertemuan;
 use App\Models\ProgressMateriMurid;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class KurikulumService
 {
-    public function duplikat(Kurikulum $asal, string $tahunAjaranBaru): Kurikulum
+    /**
+     * Satu kelas hanya boleh memakai satu kurikulum per tahun ajaran.
+     *
+     * @param  int[]  $kelasIds
+     */
+    public function pastikanKelasBelumPunyaKurikulum(array $kelasIds, string $tahunAjaran, ?int $kecualiKurikulumId = null, string $field = 'kelas_ids'): void
     {
-        $sudahAda = Kurikulum::where('kelas_id', $asal->kelas_id)
-            ->where('tahun_ajaran', $tahunAjaranBaru)
-            ->exists();
+        $bentrok = Kelas::whereIn('id', $kelasIds)
+            ->whereHas('kurikulum', fn ($q) => $q->where('tahun_ajaran', $tahunAjaran)
+                ->when($kecualiKurikulumId, fn ($q) => $q->where('kurikulum.id', '!=', $kecualiKurikulumId)))
+            ->pluck('nama');
 
-        if ($sudahAda) {
+        if ($bentrok->isNotEmpty()) {
             throw ValidationException::withMessages([
-                'tahun_ajaran' => 'Kurikulum untuk kelas ini di tahun ajaran tersebut sudah ada.',
+                $field => "{$bentrok->join(', ', ' dan ')} sudah memiliki kurikulum di tahun ajaran {$tahunAjaran}.",
             ]);
         }
+    }
 
-        return DB::transaction(function () use ($asal, $tahunAjaranBaru) {
+    public function duplikat(Kurikulum $asal, string $tahunAjaranBaru): Kurikulum
+    {
+        $kelasIds = $asal->kelas()->pluck('kelas.id')->all();
+        $this->pastikanKelasBelumPunyaKurikulum($kelasIds, $tahunAjaranBaru, field: 'tahun_ajaran');
+
+        return DB::transaction(function () use ($asal, $tahunAjaranBaru, $kelasIds) {
             $kurikulumBaru = Kurikulum::create([
-                'kelas_id'     => $asal->kelas_id,
                 'nama'         => $asal->nama,
                 'tahun_ajaran' => $tahunAjaranBaru,
                 'deskripsi'    => $asal->deskripsi,
             ]);
+            $kurikulumBaru->kelas()->sync($kelasIds);
 
             $babLama = $asal->bab()->with('materi')->get();
             foreach ($babLama as $bab) {
@@ -61,40 +75,6 @@ class KurikulumService
         });
     }
 
-    public function hitungProgressKelas(Kurikulum $kurikulum): array
-    {
-        $muridIds = MuridKelas::where('kelas_id', $kurikulum->kelas_id)
-            ->where('status', 'aktif')
-            ->whereNull('tanggal_keluar')
-            ->pluck('murid_id');
-
-        $totalUmum     = $kurikulum->materi()->umum()->count();
-        $totalIndividu = $kurikulum->materi()->individu()->count();
-
-        $progressRows = ProgressMateriMurid::whereIn('murid_id', $muridIds)
-            ->whereHas('materi', fn ($q) => $q->where('kurikulum_id', $kurikulum->id))
-            ->where('status', 'selesai')
-            ->with('materi:id,tipe')
-            ->get();
-
-        $result = [];
-        foreach ($muridIds as $muridId) {
-            $muridProgress = $progressRows->where('murid_id', $muridId);
-            $selesaiUmum     = $muridProgress->filter(fn ($p) => $p->materi?->tipe === 'umum')->count();
-            $selesaiIndividu = $muridProgress->filter(fn ($p) => $p->materi?->tipe === 'individu')->count();
-
-            $result[$muridId] = [
-                'umum'      => $totalUmum > 0 ? round(($selesaiUmum / $totalUmum) * 100, 1) : 0,
-                'individu'  => $totalIndividu > 0 ? round(($selesaiIndividu / $totalIndividu) * 100, 1) : 0,
-                'total'     => ($totalUmum + $totalIndividu) > 0
-                    ? round((($selesaiUmum + $selesaiIndividu) / ($totalUmum + $totalIndividu)) * 100, 1)
-                    : 0,
-            ];
-        }
-
-        return $result;
-    }
-
     public function hitungProgressBulan(Kurikulum $kurikulum, string $bulan): array
     {
         $materiIds = $kurikulum->materi()->targetBulan($bulan)->pluck('id');
@@ -104,14 +84,11 @@ class KurikulumService
             return ['total_target' => 0, 'selesai' => 0, 'per_bab' => []];
         }
 
-        $selesai = ProgressMateriMurid::whereIn('materi_id', $materiIds)
-            ->where('status', 'selesai')
-            ->distinct('materi_id')
-            ->count('materi_id');
-
+        // Individu: selesai bila ada murid yang menyelesaikan; umum: bila sudah disampaikan di salah satu kelas
         $materiSelesaiIds = ProgressMateriMurid::whereIn('materi_id', $materiIds)
             ->where('status', 'selesai')
             ->pluck('materi_id')
+            ->merge(PenyampaianMateri::whereIn('materi_id', $materiIds)->pluck('materi_id'))
             ->unique();
 
         $perBab = Materi::whereIn('id', $materiIds)
@@ -133,40 +110,57 @@ class KurikulumService
 
         return [
             'total_target' => $totalTarget,
-            'selesai'      => $selesai,
+            'selesai'      => $materiSelesaiIds->count(),
             'per_bab'      => $perBab,
         ];
     }
 
-    public function selesaikanMateriUmum(Materi $materi, ?int $pertemuanId): void
-    {
+    /**
+     * Catat bahwa materi umum sudah disampaikan di sebuah kelas (target pengajar, bukan per murid).
+     * Kelas diambil dari pertemuan, atau $kelasId, atau satu-satunya kelas pemakai kurikulum.
+     * Bila sudah pernah dicatat, hanya metodenya yang diperbarui (jika dikirim).
+     */
+    public function catatPenyampaian(
+        Materi $materi,
+        ?int $pertemuanId,
+        ?int $kelasId,
+        ?int $userId,
+        bool $setMetode = false,
+        ?string $metode = null,
+    ): PenyampaianMateri {
         if ($materi->tipe !== 'umum') {
             throw ValidationException::withMessages([
-                'tipe' => 'Hanya materi umum yang bisa diselesaikan sekaligus untuk semua murid.',
+                'tipe' => 'Hanya materi umum yang dicatat penyampaiannya per kelas.',
             ]);
         }
 
-        $muridIds = MuridKelas::where('kelas_id', $materi->kurikulum->kelas_id)
-            ->where('status', 'aktif')
-            ->whereNull('tanggal_keluar')
-            ->pluck('murid_id');
+        $pertemuan = $pertemuanId ? Pertemuan::find($pertemuanId) : null;
+        $kelasIds  = $materi->kurikulum->kelas()->pluck('kelas.id');
+        $kelasId   = $pertemuan?->kelas_id ?? $kelasId ?? ($kelasIds->count() === 1 ? $kelasIds->first() : null);
 
-        $now = now();
-        $rows = $muridIds->map(fn ($muridId) => [
-            'materi_id'       => $materi->id,
-            'murid_id'        => $muridId,
-            'pertemuan_id'    => $pertemuanId,
-            'status'          => 'selesai',
-            'tanggal_selesai' => $now->toDateString(),
-            'created_at'      => $now,
-            'updated_at'      => $now,
-        ])->all();
+        if (! $kelasId || ! $kelasIds->contains($kelasId)) {
+            throw ValidationException::withMessages([
+                'kelas_id' => 'Pilih kelas yang memakai kurikulum ini.',
+            ]);
+        }
 
-        // Tidak menimpa murid yang sudah selesai lebih awal
-        ProgressMateriMurid::upsert(
-            $rows,
-            ['materi_id', 'murid_id'],
-            ['pertemuan_id', 'status', 'tanggal_selesai', 'updated_at']
-        );
+        $metode = $metode !== null && trim($metode) !== '' ? trim($metode) : null;
+
+        $penyampaian = PenyampaianMateri::firstOrNew(['materi_id' => $materi->id, 'kelas_id' => $kelasId]);
+
+        if (! $penyampaian->exists) {
+            $penyampaian->fill([
+                'pertemuan_id' => $pertemuan?->id,
+                'tanggal'      => $pertemuan?->tanggal ?? now()->toDateString(),
+                'dicatat_oleh' => $userId,
+                'metode'       => $metode,
+            ]);
+        } elseif ($setMetode) {
+            $penyampaian->metode = $metode;
+        }
+
+        $penyampaian->save();
+
+        return $penyampaian;
     }
 }

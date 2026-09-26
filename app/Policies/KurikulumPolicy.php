@@ -7,9 +7,10 @@ use App\Models\User;
 
 class KurikulumPolicy
 {
-    private function isPengajarKelas(User $user, int $kelasId): bool
+    /** Pengajar di salah satu kelas yang memakai kurikulum ini. */
+    private function isPengajarKurikulum(User $user, Kurikulum $kurikulum): bool
     {
-        return \App\Models\KelasGuru::where('kelas_id', $kelasId)
+        return \App\Models\KelasGuru::whereIn('kelas_id', $kurikulum->kelas()->pluck('kelas.id'))
             ->whereHas('pengajar', fn ($q) => $q->where('user_id', $user->id))
             ->exists();
     }
@@ -24,7 +25,7 @@ class KurikulumPolicy
         if ($user->role->value === 'super_admin') {
             return true;
         }
-        return $user->role->value === 'pengajar' && $this->isPengajarKelas($user, $kurikulum->kelas_id);
+        return $user->role->value === 'pengajar' && $this->isPengajarKurikulum($user, $kurikulum);
     }
 
     // Hanya super_admin yang bisa CRUD kurikulum
@@ -49,7 +50,7 @@ class KurikulumPolicy
         if ($user->role->value === 'super_admin') {
             return true;
         }
-        return $user->role->value === 'pengajar' && $this->isPengajarKelas($user, $kurikulum->kelas_id);
+        return $user->role->value === 'pengajar' && $this->isPengajarKurikulum($user, $kurikulum);
     }
 
     public function manageMateri(User $user, Kurikulum $kurikulum): bool
@@ -57,7 +58,7 @@ class KurikulumPolicy
         if ($user->role->value === 'super_admin') {
             return true;
         }
-        return $user->role->value === 'pengajar' && $this->isPengajarKelas($user, $kurikulum->kelas_id);
+        return $user->role->value === 'pengajar' && $this->isPengajarKurikulum($user, $kurikulum);
     }
 
     public function manageProgress(User $user, Kurikulum $kurikulum): bool
@@ -65,6 +66,6 @@ class KurikulumPolicy
         if ($user->role->value === 'super_admin') {
             return true;
         }
-        return $user->role->value === 'pengajar' && $this->isPengajarKelas($user, $kurikulum->kelas_id);
+        return $user->role->value === 'pengajar' && $this->isPengajarKurikulum($user, $kurikulum);
     }
 }

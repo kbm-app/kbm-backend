@@ -71,18 +71,32 @@ class MateriController extends Controller
         return response()->json(['data' => $kurikulum->materi()->get()]);
     }
 
+    /**
+     * Catat penyampaian materi umum di satu kelas. Kirim `metode` untuk mengisi/mengubah
+     * cara penyampaiannya (mis. "Nasehat & Praktek").
+     */
     public function selesaikanUmum(Request $request, Materi $materi): JsonResponse
     {
         $this->authorize('manageProgress', $materi->kurikulum);
 
         $request->validate([
             'pertemuan_id' => ['nullable', 'integer', 'exists:pertemuan,id'],
+            'kelas_id'     => ['nullable', 'integer'],
+            'metode'       => ['nullable', 'string', 'max:100'],
         ]);
 
-        $this->service->selesaikanMateriUmum($materi, $request->pertemuan_id);
+        $penyampaian = $this->service->catatPenyampaian(
+            $materi,
+            $request->integer('pertemuan_id') ?: null,
+            $request->integer('kelas_id') ?: null,
+            $request->user()->id,
+            $request->has('metode'),
+            $request->input('metode'),
+        );
 
         return response()->json([
-            'message' => 'Materi berhasil ditandai selesai untuk semua murid aktif.',
+            'message'     => 'Materi ditandai sudah disampaikan.',
+            'penyampaian' => $penyampaian,
         ]);
     }
 

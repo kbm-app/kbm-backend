@@ -14,7 +14,8 @@ class StoreKurikulumRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'kelas_id'     => ['required', 'integer', 'exists:kelas,id'],
+            'kelas_ids'    => ['required', 'array', 'min:1'],
+            'kelas_ids.*'  => ['integer', 'distinct', 'exists:kelas,id'],
             'nama'         => ['required', 'string', 'max:200'],
             'tahun_ajaran' => ['required', 'string', 'regex:/^\d{4}\/\d{4}$/'],
             'deskripsi'    => ['nullable', 'string'],

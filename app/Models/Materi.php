@@ -61,8 +61,15 @@ class Materi extends Model
         return $this->belongsTo(BabKurikulum::class, 'bab_kurikulum_id');
     }
 
+    /** Progress per murid — hanya untuk materi individu */
     public function progress(): HasMany
     {
         return $this->hasMany(ProgressMateriMurid::class);
+    }
+
+    /** Penyampaian per kelas — hanya untuk materi umum */
+    public function penyampaian(): HasMany
+    {
+        return $this->hasMany(PenyampaianMateri::class);
     }
 }

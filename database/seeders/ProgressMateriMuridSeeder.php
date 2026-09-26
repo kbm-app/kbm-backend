@@ -7,6 +7,7 @@ use App\Models\Kurikulum;
 use App\Models\Materi;
 use App\Models\Murid;
 use App\Models\MuridKelas;
+use App\Models\PenyampaianMateri;
 use App\Models\ProgressMateriMurid;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +45,7 @@ class ProgressMateriMuridSeeder extends Seeder
                 continue;
             }
 
-            $kurikulum = Kurikulum::where('kelas_id', $kelas->id)
+            $kurikulum = Kurikulum::untukKelas($kelas->id)
                 ->where('tahun_ajaran', self::TA)
                 ->first();
             if (! $kurikulum) {
@@ -61,11 +62,14 @@ class ProgressMateriMuridSeeder extends Seeder
                 continue;
             }
 
-            $materiList = Materi::where('kurikulum_id', $kurikulum->id)->get();
+            // Individu → capaian per murid; umum → penyampaian per kelas
+            $materiList = Materi::where('kurikulum_id', $kurikulum->id)->individu()->get();
 
             foreach ($muridIds as $muridId) {
                 $this->seedProgressMurid($muridId, $materiList);
             }
+
+            $this->seedPenyampaianKelas($kelas->id, Materi::where('kurikulum_id', $kurikulum->id)->umum()->get());
         }
     }
 
@@ -120,6 +124,26 @@ class ProgressMateriMuridSeeder extends Seeder
             foreach (array_chunk($inserts, 200) as $chunk) {
                 DB::table('progress_materi_murid')->insertOrIgnore($chunk);
             }
+        }
+    }
+
+    private function seedPenyampaianKelas(int $kelasId, $materiUmum): void
+    {
+        $metodeContoh = ['Nasehat', 'Nasehat & Praktek', 'Menulis & Nasehat', 'Praktek'];
+
+        foreach ($materiUmum as $materi) {
+            $rate = $this->completionRate[$materi->target_bulan] ?? 0.5;
+            if (mt_rand(1, 100) / 100 > $rate) {
+                continue;
+            }
+
+            PenyampaianMateri::firstOrCreate(
+                ['materi_id' => $materi->id, 'kelas_id' => $kelasId],
+                [
+                    'metode'  => $metodeContoh[array_rand($metodeContoh)],
+                    'tanggal' => $this->tanggalSelesaiBulan($materi->target_bulan),
+                ]
+            );
         }
     }
 

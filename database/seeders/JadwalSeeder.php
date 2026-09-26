@@ -15,26 +15,24 @@ class JadwalSeeder extends Seeder
     public function run(): void
     {
         $jadwal = [
-            // Pengajian Rutin — mingguan, aktif sekarang
-            ['program' => 'Pengajian Rutin', 'kelas' => 'Kelas 5',         'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => 'senin',  'jam_mulai' => '15:30', 'jam_selesai' => '16:30', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => null],
-            ['program' => 'Pengajian Rutin', 'kelas' => 'Kelas 6',         'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => 'selasa', 'jam_mulai' => '15:30', 'jam_selesai' => '16:30', 'mulai_berlaku' => '2026-01-01', 'selesai_berlaku' => null],
             ['program' => 'Pengajian Rutin', 'kelas' => 'Kelas Pra-Remaja', 'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => 'rabu',   'jam_mulai' => '16:00', 'jam_selesai' => '17:30', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => null],
             ['program' => 'Pengajian Rutin', 'kelas' => 'Kelas Remaja',    'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => 'kamis',  'jam_mulai' => '16:00', 'jam_selesai' => '17:30', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => null],
 
             // Pengajian Rutin Kelas 6 — jadwal lama, sudah ditutup (histori ganti jadwal)
             ['program' => 'Pengajian Rutin', 'kelas' => 'Kelas 6',         'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => 'senin',  'jam_mulai' => '15:00', 'jam_selesai' => '16:00', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => '2025-12-31'],
-
-            // Pengajian Rutin Kelas Usman — bulanan, minggu ke-2
-            ['program' => 'Pengajian Rutin', 'kelas' => 'Kelas Usman',     'frekuensi' => 'bulanan',  'minggu_ke' => 2,    'hari' => 'kamis',  'jam_mulai' => '19:00', 'jam_selesai' => '21:00', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => null],
-
-            // Tahfidz — mingguan, setoran hafalan ba'da isya
-            ['program' => 'Tahfidz', 'kelas' => 'Kelas 6',                 'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => 'senin',  'jam_mulai' => '19:30', 'jam_selesai' => '20:30', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => null],
-            ['program' => 'Tahfidz', 'kelas' => 'Kelas Pra-Remaja',        'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => 'selasa', 'jam_mulai' => '19:30', 'jam_selesai' => '20:30', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => null],
-
-            // Persinas ASAD — mingguan, sabtu pagi
-            ['program' => 'Persinas ASAD', 'kelas' => 'Kelas Pra-Remaja',  'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => 'sabtu',  'jam_mulai' => '08:00', 'jam_selesai' => '10:00', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => null],
-            ['program' => 'Persinas ASAD', 'kelas' => 'Kelas Remaja',      'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => 'sabtu',  'jam_mulai' => '10:00', 'jam_selesai' => '12:00', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => null],
         ];
+
+        // Pengajian Rutin PAUD s.d. Kelas 6 (Kelas 3 dibagi 2 kelompok: 3-1 & 3-2) — setiap Senin–Jumat
+        foreach (['PAUD', 'Kelas 1', 'Kelas 2', 'Kelas 3-1', 'Kelas 3-2', 'Kelas 4', 'Kelas 5', 'Kelas 6'] as $kelas) {
+            foreach (['senin', 'selasa', 'rabu', 'kamis', 'jumat'] as $hari) {
+                $jadwal[] = ['program' => 'Pengajian Rutin', 'kelas' => $kelas, 'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => $hari, 'jam_mulai' => '15:30', 'jam_selesai' => '16:30', 'mulai_berlaku' => '2026-07-01', 'selesai_berlaku' => null];
+            }
+        }
+
+        // Pengajian Rutin Kelas Usman — setiap Sabtu & Minggu malam
+        foreach (['sabtu', 'minggu'] as $hari) {
+            $jadwal[] = ['program' => 'Pengajian Rutin', 'kelas' => 'Kelas Usman', 'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => $hari, 'jam_mulai' => '20:30', 'jam_selesai' => '21:30', 'mulai_berlaku' => '2026-07-01', 'selesai_berlaku' => null];
+        }
 
         foreach ($jadwal as $item) {
             $program = Program::where('nama', $item['program'])->first();
@@ -65,7 +63,7 @@ class JadwalSeeder extends Seeder
         // Jadwal bulanan lintas kelas (kelas_id null)
         $jadwalBulanan = [
             // Keakraban gabungan — bulanan, minggu ke-3, minggu pagi
-            ['program' => 'Keakraban', 'frekuensi' => 'bulanan', 'minggu_ke' => 3, 'hari' => 'minggu', 'jam_mulai' => '08:00', 'jam_selesai' => '12:00', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => null],
+            ['program' => 'Keakraban', 'frekuensi' => 'bulanan', 'minggu_ke' => 3, 'hari' => 'minggu', 'jam_mulai' => '19:00', 'jam_selesai' => '21:00', 'mulai_berlaku' => '2026-09-25', 'selesai_berlaku' => null],
         ];
 
         foreach ($jadwalBulanan as $item) {

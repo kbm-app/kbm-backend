@@ -9,6 +9,7 @@ use App\Models\Kurikulum;
 use App\Models\Murid;
 use App\Models\MuridKelas;
 use App\Models\Program;
+use App\Models\PenyampaianMateri;
 use App\Models\ProgressMateriMurid;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -160,7 +161,7 @@ class DashboardController extends Controller
         }
 
         $bulanIni  = $this->bulanIndonesia(now()->month);
-        $kurikulum = Kurikulum::where('kelas_id', $kelasId)
+        $kurikulum = Kurikulum::untukKelas($kelasId)
             ->where('tahun_ajaran', $this->currentTahunAjaran())
             ->first();
 
@@ -181,12 +182,7 @@ class DashboardController extends Controller
             $ids       = $kurikulum->materi()->umum()->targetBulan($bulanTren)->pluck('id');
             $total     = $ids->count();
             $selesai   = $total > 0
-                ? ProgressMateriMurid::whereIn('materi_id', $ids)
-                    ->whereIn('murid_id', $muridIds)
-                    ->where('status', 'selesai')
-                    ->pluck('materi_id')
-                    ->unique()
-                    ->count()
+                ? PenyampaianMateri::where('kelas_id', $kelasId)->whereIn('materi_id', $ids)->count()
                 : 0;
 
             $tren[] = [
@@ -203,11 +199,9 @@ class DashboardController extends Controller
             ->with('bab:id,kode,nama')
             ->get();
 
-        $selesaiUmum = ProgressMateriMurid::whereIn('materi_id', $materiUmumBulanIni->pluck('id'))
-            ->whereIn('murid_id', $muridIds)
-            ->where('status', 'selesai')
-            ->pluck('materi_id')
-            ->unique();
+        $selesaiUmum = PenyampaianMateri::where('kelas_id', $kelasId)
+            ->whereIn('materi_id', $materiUmumBulanIni->pluck('id'))
+            ->pluck('materi_id');
 
         $umumPerBab = $materiUmumBulanIni->groupBy('bab_kurikulum_id')
             ->map(function ($items) use ($selesaiUmum) {
@@ -230,11 +224,9 @@ class DashboardController extends Controller
             ->get();
 
         $selesaiBacklog = $backlogMateri->isNotEmpty()
-            ? ProgressMateriMurid::whereIn('materi_id', $backlogMateri->pluck('id'))
-                ->whereIn('murid_id', $muridIds)
-                ->where('status', 'selesai')
+            ? PenyampaianMateri::where('kelas_id', $kelasId)
+                ->whereIn('materi_id', $backlogMateri->pluck('id'))
                 ->pluck('materi_id')
-                ->unique()
             : collect();
 
         $backlog = $backlogMateri

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -36,6 +37,11 @@ class Kelas extends Model
     public function muridKelas(): HasMany
     {
         return $this->hasMany(MuridKelas::class);
+    }
+
+    public function kurikulum(): BelongsToMany
+    {
+        return $this->belongsToMany(Kurikulum::class, 'kurikulum_kelas')->withTimestamps();
     }
 
     public function muridAktif(): HasMany

@@ -9,6 +9,7 @@ use App\Models\LaporanMusyawarah;
 use App\Models\Musyawarah;
 use App\Models\MuridKelas;
 use App\Models\Pertemuan;
+use App\Models\PenyampaianMateri;
 use App\Models\ProgressMateriMurid;
 
 class MusyawarahService
@@ -104,7 +105,7 @@ class MusyawarahService
             : ($tahun - 1) . "/{$tahun}";
         $namaBulan    = $this->bulanIndonesia($bulan);
 
-        $kurikulum = Kurikulum::where('kelas_id', $kelasId)
+        $kurikulum = Kurikulum::untukKelas($kelasId)
             ->where('tahun_ajaran', $tahunAjaran)
             ->first();
 
@@ -117,16 +118,15 @@ class MusyawarahService
             ->whereNull('tanggal_keluar')
             ->pluck('murid_id');
 
-        // --- Progress Umum: materi target bulan ini, selesai jika ada 1 murid yang selesai ---
+        // --- Progress Umum: materi target bulan ini yang sudah disampaikan di kelas ini ---
         $materiUmumIds = $kurikulum->materi()->umum()->targetBulan($namaBulan)->pluck('id');
         $totalUmum     = $materiUmumIds->count();
         $progressUmum  = null;
 
         if ($totalUmum > 0) {
-            $selesaiUmum  = ProgressMateriMurid::whereIn('materi_id', $materiUmumIds)
-                ->where('status', 'selesai')
-                ->distinct('materi_id')
-                ->count('materi_id');
+            $selesaiUmum  = PenyampaianMateri::where('kelas_id', $kelasId)
+                ->whereIn('materi_id', $materiUmumIds)
+                ->count();
             $progressUmum = round(($selesaiUmum / $totalUmum) * 100, 1);
         }
 

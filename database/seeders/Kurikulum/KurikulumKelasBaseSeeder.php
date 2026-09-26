@@ -12,7 +12,8 @@ abstract class KurikulumKelasBaseSeeder extends Seeder
 {
     protected const TA = '2026/2027';
 
-    abstract protected function kelasNama(): string;
+    /** Nama kelas pemakai kurikulum — bisa lebih dari satu (mis. ['Kelas 3-1', 'Kelas 3-2']). */
+    abstract protected function kelasNama(): string|array;
     abstract protected function kurikulumNama(): string;
     abstract protected function materiData(): array;
 
@@ -27,22 +28,25 @@ abstract class KurikulumKelasBaseSeeder extends Seeder
 
     public function run(): void
     {
-        $kelas = Kelas::where('nama', $this->kelasNama())->first();
-        if (! $kelas) {
-            $this->command->warn("Kelas '{$this->kelasNama()}' tidak ditemukan, skip.");
+        $kelasNama = (array) $this->kelasNama();
+        $kelas     = Kelas::whereIn('nama', $kelasNama)->get();
+
+        foreach (array_diff($kelasNama, $kelas->pluck('nama')->all()) as $nama) {
+            $this->command->warn("Kelas '{$nama}' tidak ditemukan, skip.");
+        }
+        if ($kelas->isEmpty()) {
             return;
         }
 
         $materiData = $this->materiData();
         if (empty($materiData)) {
-            $this->command->warn("Data materi '{$this->kelasNama()}' belum diisi, skip.");
+            $this->command->warn("Data materi '{$this->kurikulumNama()}' belum diisi, skip.");
             return;
         }
 
-        $kurikulum = Kurikulum::firstOrCreate(
-            ['kelas_id' => $kelas->id, 'tahun_ajaran' => static::TA],
-            ['nama' => $this->kurikulumNama()]
-        );
+        $kurikulum = Kurikulum::untukKelas($kelas->first()->id)->tahunAjaran(static::TA)->first()
+            ?? Kurikulum::create(['nama' => $this->kurikulumNama(), 'tahun_ajaran' => static::TA]);
+        $kurikulum->kelas()->syncWithoutDetaching($kelas->pluck('id'));
 
         $babMap = [];
         foreach ($this->babList() as $idx => $bab) {
@@ -69,10 +73,11 @@ abstract class KurikulumKelasBaseSeeder extends Seeder
                     'bab_kurikulum_id' => $babId,
                     'judul'            => $item['judul'],
                     'target_bulan'     => $item['bulan'],
+                    // Judul yang sama bisa muncul sebagai materi umum & individu di bulan yang sama
+                    'tipe'             => $item['tipe'],
                 ],
                 [
                     'sub_bab' => $item['sub_bab'] ?? null,
-                    'tipe'    => $item['tipe'],
                     'metode'  => $item['metode'] ?? null,
                     'urutan'  => $urutan[$key],
                 ]

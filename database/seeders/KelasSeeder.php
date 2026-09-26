@@ -35,7 +35,15 @@ class KelasSeeder extends Seeder
                 'is_aktif'         => true,
             ],
             [
-                'nama'             => 'Kelas 3',
+                'nama'             => 'Kelas 3-1',
+                'deskripsi'        => 'Kelas untuk usia setara SD kelas 3',
+                'rentang_usia_min' => 8,
+                'rentang_usia_max' => 9,
+                'kapasitas'        => 15,
+                'is_aktif'         => true,
+            ],
+            [
+                'nama'             => 'Kelas 3-2',
                 'deskripsi'        => 'Kelas untuk usia setara SD kelas 3',
                 'rentang_usia_min' => 8,
                 'rentang_usia_max' => 9,
