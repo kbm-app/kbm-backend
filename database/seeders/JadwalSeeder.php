@@ -22,10 +22,22 @@ class JadwalSeeder extends Seeder
             ['program' => 'Pengajian Rutin', 'kelas' => 'Kelas 6',         'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => 'senin',  'jam_mulai' => '15:00', 'jam_selesai' => '16:00', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => '2025-12-31'],
         ];
 
-        // Pengajian Rutin PAUD s.d. Kelas 6 (Kelas 3 dibagi 2 kelompok: 3-1 & 3-2) — setiap Senin–Jumat
+        // Pengajian Rutin PAUD s.d. Kelas 6 (Kelas 3 dibagi 2 kelompok: 3-1 & 3-2) — setiap Senin–Jumat.
+        // Mulai 26 Sep 2026 tiap kelas dibedakan waktunya (pengumuman: guru terbatas & target tiap kelas beda);
+        // jadwal lama 15:30–16:30 ditutup 25 Sep 2026 sebagai histori ganti jadwal.
+        $jamBaru = [
+            'Kelas 1'   => ['16:10', '17:00'], 'Kelas 2'   => ['17:00', '17:50'],
+            'Kelas 3-1' => ['16:10', '17:00'], 'Kelas 3-2' => ['16:10', '17:00'],
+            'Kelas 4'   => ['17:00', '17:50'], 'Kelas 5'   => ['16:10', '17:00'],
+            'Kelas 6'   => ['17:00', '17:50'],
+        ];
         foreach (['PAUD', 'Kelas 1', 'Kelas 2', 'Kelas 3-1', 'Kelas 3-2', 'Kelas 4', 'Kelas 5', 'Kelas 6'] as $kelas) {
             foreach (['senin', 'selasa', 'rabu', 'kamis', 'jumat'] as $hari) {
-                $jadwal[] = ['program' => 'Pengajian Rutin', 'kelas' => $kelas, 'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => $hari, 'jam_mulai' => '15:30', 'jam_selesai' => '16:30', 'mulai_berlaku' => '2026-07-01', 'selesai_berlaku' => null];
+                $baru = $jamBaru[$kelas] ?? null;
+                $jadwal[] = ['program' => 'Pengajian Rutin', 'kelas' => $kelas, 'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => $hari, 'jam_mulai' => '15:30', 'jam_selesai' => '16:30', 'mulai_berlaku' => '2026-07-01', 'selesai_berlaku' => $baru ? '2026-09-25' : null];
+                if ($baru) {
+                    $jadwal[] = ['program' => 'Pengajian Rutin', 'kelas' => $kelas, 'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => $hari, 'jam_mulai' => $baru[0], 'jam_selesai' => $baru[1], 'mulai_berlaku' => '2026-09-26', 'selesai_berlaku' => null];
+                }
             }
         }
 
