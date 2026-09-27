@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\JabatanPengurus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -42,6 +44,87 @@ class Kelas extends Model
     public function kurikulum(): BelongsToMany
     {
         return $this->belongsToMany(Kurikulum::class, 'kurikulum_kelas')->withTimestamps();
+    }
+
+    public function pengurus(): HasMany
+    {
+        return $this->hasMany(KelasPengurus::class);
+    }
+
+    public function scopeDiajarOleh(Builder $query, User $user): Builder
+    {
+        return $query->whereHas('kelasGuru', fn ($k) =>
+            $k->whereHas('pengajar', fn ($p) => $p->where('user_id', $user->id))
+        );
+    }
+
+    /** Kelas tempat akun murid ini memegang salah satu jabatan yang diberikan. */
+    public function scopeDipegangPengurus(Builder $query, User $user, array $jabatan): Builder
+    {
+        return $query->whereHas('pengurus', fn ($p) => $p
+            ->whereIn('jabatan', $jabatan)
+            ->berlakuUntuk($user)
+        );
+    }
+
+    /**
+     * Kelas yang kasnya boleh dikelola user: super admin semua kelas,
+     * pengajar kelas yang diajar, murid kelas tempat ia menjadi bendahara.
+     */
+    public function scopeAksesKas(Builder $query, User $user): Builder
+    {
+        return match ($user->role->value) {
+            'super_admin' => $query,
+            'pengajar'    => $query->diajarOleh($user),
+            'murid'       => $query->dipegangPengurus($user, [JabatanPengurus::Bendahara->value]),
+            default       => $query->whereRaw('1 = 0'),
+        };
+    }
+
+    /**
+     * Kelas yang sesi & absensinya boleh dikelola user: super admin semua kelas,
+     * pengajar kelas yang diajar, murid kelas tempat ia menjadi ketua/penerobos.
+     */
+    public function scopeAksesAbsensi(Builder $query, User $user): Builder
+    {
+        return match ($user->role->value) {
+            'super_admin' => $query,
+            'pengajar'    => $query->diajarOleh($user),
+            'murid'       => $query->dipegangPengurus($user, array_column(JabatanPengurus::pengelolaAbsensi(), 'value')),
+            default       => $query->whereRaw('1 = 0'),
+        };
+    }
+
+    /** Kelas yang kurikulum & progresnya boleh dilihat murid pengurus (ketua). */
+    public function scopeAksesKurikulum(Builder $query, User $user): Builder
+    {
+        return $query->dipegangPengurus($user, array_column(JabatanPengurus::pelihatKurikulum(), 'value'));
+    }
+
+    /**
+     * Kelas yang jadwalnya boleh dilihat murid pengurus: ketua (untuk membuka sesi)
+     * dan penerobos (untuk mengingatkan jadwal & pengajar). Staf melihat semua jadwal.
+     */
+    public function scopeAksesJadwal(Builder $query, User $user): Builder
+    {
+        return match ($user->role->value) {
+            'super_admin', 'pengajar' => $query,
+            'murid'   => $query->dipegangPengurus($user, [
+                JabatanPengurus::Ketua->value,
+                JabatanPengurus::Penerobos->value,
+            ]),
+            default   => $query->whereRaw('1 = 0'),
+        };
+    }
+
+    public function bisaKelolaAbsensi(User $user): bool
+    {
+        return static::whereKey($this->id)->aksesAbsensi($user)->exists();
+    }
+
+    public function bisaKelolaKas(User $user): bool
+    {
+        return static::whereKey($this->id)->aksesKas($user)->exists();
     }
 
     public function muridAktif(): HasMany

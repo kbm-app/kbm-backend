@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Enums\JabatanPengurus;
 use App\Models\Pengajar;
 use App\Models\User;
 
@@ -12,7 +13,8 @@ class PengajarPolicy
      */
     public function viewAny(User $user): bool
     {
-        return in_array($user->role->value, ['super_admin', 'pengajar']);
+        return in_array($user->role->value, ['super_admin', 'pengajar'])
+            || $user->punyaJabatan(...JabatanPengurus::pengelolaAbsensi());
     }
 
     public function view(User $user, Pengajar $pengajar): bool

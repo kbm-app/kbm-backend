@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\Kelas;
 use App\Models\Murid;
 use App\Models\User;
 
@@ -12,7 +13,8 @@ class MuridPolicy
      */
     public function viewAny(User $user): bool
     {
-        return in_array($user->role->value, ['super_admin', 'pengajar']);
+        // murid: hanya pengurus kelas, dan hasilnya dibatasi di MuridController::index
+        return in_array($user->role->value, ['super_admin', 'pengajar', 'murid']);
     }
 
     public function view(User $user, Murid $murid): bool
@@ -20,7 +22,8 @@ class MuridPolicy
         return match ($user->role->value) {
             'super_admin' => true,
             'pengajar'    => true,
-            'murid'       => $murid->user_id === $user->id,
+            'murid'       => $murid->user_id === $user->id
+                || $murid->kelasAktif()->whereIn('kelas_id', Kelas::aksesAbsensi($user)->select('id'))->exists(),
             'wali_murid'  => $murid->waliMurid()->where('user_id', $user->id)->exists(),
             default       => false,
         };

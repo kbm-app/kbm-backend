@@ -36,6 +36,10 @@ class KurikulumController extends Controller
             );
         }
 
+        if ($user->role->value === 'murid') {
+            $query->whereHas('kelas', fn ($q) => $q->aksesKurikulum($user));
+        }
+
         return response()->json(['data' => $query->orderBy('tahun_ajaran', 'desc')->orderBy('nama')->get()]);
     }
 

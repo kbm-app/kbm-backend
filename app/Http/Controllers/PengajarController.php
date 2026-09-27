@@ -21,7 +21,17 @@ class PengajarController extends Controller
             ->when($request->search, fn($q) => $q->whereHas('user', fn($u) => $u->where('name', 'ilike', "%{$request->search}%")))
             ->when($request->has('is_aktif'), fn($q) => $q->where('is_aktif', $request->boolean('is_aktif')));
 
-        return response()->json($query->paginate(15));
+        $page = $query->paginate(15);
+
+        // Ketua kelas cukup tahu nama pengajar (untuk form buka sesi), tanpa kontak & data pribadi
+        if ($request->user()->role->value === 'murid') {
+            $page->getCollection()->transform(fn ($p) => [
+                'id'   => $p->id,
+                'user' => ['id' => $p->user?->id, 'name' => $p->user?->name],
+            ]);
+        }
+
+        return response()->json($page);
     }
 
     public function store(StorePengajarRequest $request): JsonResponse

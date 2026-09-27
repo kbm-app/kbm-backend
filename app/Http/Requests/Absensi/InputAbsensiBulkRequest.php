@@ -8,7 +8,8 @@ class InputAbsensiBulkRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return in_array($this->user()->role->value, ['super_admin', 'pengajar']);
+        // Batasan per kelas (termasuk ketua kelas) dicek oleh PertemuanPolicy di controller
+        return in_array($this->user()->role->value, ['super_admin', 'pengajar', 'murid']);
     }
 
     public function rules(): array

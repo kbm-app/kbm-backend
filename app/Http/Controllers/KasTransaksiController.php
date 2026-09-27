@@ -93,15 +93,7 @@ class KasTransaksiController extends Controller
         $bulan = $request->integer('bulan') ?: null;
         $tahun = $request->integer('tahun') ?: null;
 
-        $query = Kelas::where('is_aktif', true);
-
-        if ($user->role->value === 'pengajar') {
-            $query->whereHas('kelasGuru', fn ($q) =>
-                $q->whereHas('pengajar', fn ($p) => $p->where('user_id', $user->id))
-            );
-        }
-
-        $kelasList = $query->orderBy('nama')->get();
+        $kelasList = Kelas::where('is_aktif', true)->aksesKas($user)->orderBy('nama')->get();
 
         $saldoPerKelas = $this->service->hitungSaldoBanyakKelas($kelasList->pluck('id'), $bulan, $tahun);
 

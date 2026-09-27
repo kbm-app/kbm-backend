@@ -23,7 +23,10 @@ class JadwalController extends Controller
             ->when($request->program_id, fn ($q) => $q->where('program_id', $request->program_id))
             ->when($request->kelas_id, fn ($q) => $q->where('kelas_id', $request->kelas_id))
             ->when($request->hari, fn ($q) => $q->where('hari', $request->hari))
-            ->when($request->boolean('hanya_aktif'), fn ($q) => $q->aktif());
+            ->when($request->boolean('hanya_aktif'), fn ($q) => $q->aktif())
+            ->when($request->user()->role->value === 'murid', fn ($q) =>
+                $q->whereIn('kelas_id', Kelas::aksesJadwal($request->user())->select('id'))
+            );
 
         return response()->json(['data' => $query->orderByRaw("
             CASE hari
@@ -88,7 +91,7 @@ class JadwalController extends Controller
 
     public function jadwalKelas(Request $request, Kelas $kelas): JsonResponse
     {
-        $this->authorize('view', $kelas);
+        $this->authorize('viewJadwal', $kelas);
 
         $jadwal = $this->service->getAktif($kelas->id);
         return response()->json(['data' => $jadwal]);
@@ -102,6 +105,9 @@ class JadwalController extends Controller
             ->with(['program', 'kelas', 'pengajar.user'])
             ->when($request->program_id, fn ($q) => $q->where('program_id', $request->program_id))
             ->when($request->kelas_id, fn ($q) => $q->where('kelas_id', $request->kelas_id))
+            ->when($request->user()->role->value === 'murid', fn ($q) =>
+                $q->whereIn('kelas_id', Kelas::aksesJadwal($request->user())->select('id'))
+            )
             ->get();
 
         $urutan = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];

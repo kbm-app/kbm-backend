@@ -82,7 +82,7 @@ class PengumumanService
             return collect();
         }
 
-        $kelas = Kelas::with(['muridAktif.murid.waliMurid.user', 'kelasGuru.pengajar.user'])->find($kelasId);
+        $kelas = Kelas::with(['muridAktif.murid.waliMurid.user', 'kelasGuru.pengajar.user', 'pengurus.murid'])->find($kelasId);
         if (! $kelas) {
             return collect();
         }
@@ -101,6 +101,13 @@ class PengumumanService
         foreach ($kelas->kelasGuru as $kelasGuru) {
             if ($kelasGuru->pengajar?->user_id) {
                 $userIds->push($kelasGuru->pengajar->user_id);
+            }
+        }
+
+        // pengurus kelas (ketua, bendahara, ...) yang punya akun
+        foreach ($kelas->pengurus as $pengurus) {
+            if ($pengurus->murid?->user_id) {
+                $userIds->push($pengurus->murid->user_id);
             }
         }
 

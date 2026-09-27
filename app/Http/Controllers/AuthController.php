@@ -34,7 +34,7 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return response()->json(['user' => $user]);
+        return response()->json(['user' => [...$user->toArray(), 'pengurus' => $user->jabatanPengurus()]]);
     }
 
     public function setPassword(SetPasswordRequest $request): JsonResponse
@@ -63,7 +63,9 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json(['user' => $request->user()]);
+        $user = $request->user();
+
+        return response()->json(['user' => [...$user->toArray(), 'pengurus' => $user->jabatanPengurus()]]);
     }
 
     public function updateProfile(UpdateProfileRequest $request): JsonResponse

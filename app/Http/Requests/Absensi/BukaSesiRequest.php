@@ -2,13 +2,20 @@
 
 namespace App\Http\Requests\Absensi;
 
+use App\Models\Kelas;
 use Illuminate\Foundation\Http\FormRequest;
 
 class BukaSesiRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return in_array($this->user()->role->value, ['super_admin', 'pengajar']);
+        if (in_array($this->user()->role->value, ['super_admin', 'pengajar'])) {
+            return true;
+        }
+
+        // Ketua kelas hanya boleh membuka sesi untuk kelasnya sendiri
+        $kelas = Kelas::find($this->input('kelas_id'));
+        return $kelas !== null && $kelas->bisaKelolaAbsensi($this->user());
     }
 
     public function rules(): array

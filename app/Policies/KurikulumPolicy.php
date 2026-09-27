@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Enums\JabatanPengurus;
 use App\Models\Kurikulum;
 use App\Models\User;
 
@@ -17,15 +18,19 @@ class KurikulumPolicy
 
     public function viewAny(User $user): bool
     {
-        return in_array($user->role->value, ['super_admin', 'pengajar']);
+        return in_array($user->role->value, ['super_admin', 'pengajar'])
+            || $user->punyaJabatan(...JabatanPengurus::pelihatKurikulum());
     }
 
     public function view(User $user, Kurikulum $kurikulum): bool
     {
-        if ($user->role->value === 'super_admin') {
-            return true;
-        }
-        return $user->role->value === 'pengajar' && $this->isPengajarKurikulum($user, $kurikulum);
+        return match ($user->role->value) {
+            'super_admin' => true,
+            'pengajar'    => $this->isPengajarKurikulum($user, $kurikulum),
+            // Ketua kelas: hanya lihat (tidak ada izin manage*)
+            'murid'       => $kurikulum->kelas()->aksesKurikulum($user)->exists(),
+            default       => false,
+        };
     }
 
     // Hanya super_admin yang bisa CRUD kurikulum

@@ -9,6 +9,7 @@ use App\Http\Requests\Absensi\UpdateAbsensiMuridRequest;
 use App\Http\Requests\Absensi\UpdatePertemuanRequest;
 use App\Models\AbsensiMurid;
 use App\Models\AbsensiPengajar;
+use App\Models\Kelas;
 use App\Models\Murid;
 use App\Models\Pertemuan;
 use App\Services\AbsensiService;
@@ -35,11 +36,9 @@ class PertemuanController extends Controller
             ->when($request->bulan, fn ($q) => $q->whereMonth('tanggal', $request->bulan))
             ->when($request->tahun, fn ($q) => $q->whereYear('tanggal', $request->tahun));
 
-        // Pengajar hanya melihat pertemuan di kelas yang diajar
-        if ($user->role->value === 'pengajar') {
-            $query->whereHas('kelas.kelasGuru', fn ($q) =>
-                $q->whereHas('pengajar', fn ($p) => $p->where('user_id', $user->id))
-            );
+        // Pengajar hanya melihat pertemuan di kelas yang diajar, ketua kelas di kelasnya
+        if ($user->role->value !== 'super_admin') {
+            $query->whereIn('kelas_id', Kelas::aksesAbsensi($user)->select('id'));
         }
 
         return response()->json(['data' => $query->orderByDesc('tanggal')->orderByDesc('jam_mulai')->get()]);
@@ -165,6 +164,10 @@ class PertemuanController extends Controller
             'bulan'    => ['required', 'integer', 'min:1', 'max:12'],
             'tahun'    => ['required', 'integer', 'min:2020'],
         ]);
+
+        if ($request->user()->role->value === 'murid') {
+            abort_unless(Kelas::findOrFail($request->kelas_id)->bisaKelolaAbsensi($request->user()), 403);
+        }
 
         $pertemuanIds = Pertemuan::selesai()
             ->where('kelas_id', $request->kelas_id)

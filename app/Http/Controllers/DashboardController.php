@@ -103,11 +103,7 @@ class DashboardController extends Controller
         $kelasId = $request->integer('kelas_id') ?: null;
 
         $kelasQuery = Kelas::where('is_aktif', true)
-            ->when($user->role->value === 'pengajar', fn ($q) =>
-                $q->whereHas('kelasGuru', fn ($k) =>
-                    $k->whereHas('pengajar', fn ($p) => $p->where('user_id', $user->id))
-                )
-            )
+            ->aksesKas($user)
             ->when($kelasId, fn ($q) => $q->where('id', $kelasId));
 
         $kelasIds = $kelasQuery->pluck('id');
@@ -325,13 +321,7 @@ class DashboardController extends Controller
 
     private function hitungKasTotal(User $user): array
     {
-        $kelasIds = Kelas::where('is_aktif', true)
-            ->when($user->role->value === 'pengajar', fn ($q) =>
-                $q->whereHas('kelasGuru', fn ($k) =>
-                    $k->whereHas('pengajar', fn ($p) => $p->where('user_id', $user->id))
-                )
-            )
-            ->pluck('id');
+        $kelasIds = Kelas::where('is_aktif', true)->aksesKas($user)->pluck('id');
 
         $transaksi = KasTransaksi::with('kategori')
             ->whereIn('kelas_id', $kelasIds)

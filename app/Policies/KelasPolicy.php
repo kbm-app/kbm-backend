@@ -9,7 +9,7 @@ class KelasPolicy
 {
     public function viewAny(User $user): bool
     {
-        return in_array($user->role->value, ['super_admin', 'pengajar']);
+        return in_array($user->role->value, ['super_admin', 'pengajar', 'murid']);
     }
 
     public function view(User $user, Kelas $kelas): bool
@@ -25,6 +25,13 @@ class KelasPolicy
         }
 
         return false;
+    }
+
+    // Ketua & penerobos boleh melihat jadwal kelasnya, tanpa akses detail kelas lain
+    public function viewJadwal(User $user, Kelas $kelas): bool
+    {
+        return $this->view($user, $kelas)
+            || Kelas::whereKey($kelas->id)->aksesJadwal($user)->exists();
     }
 
     public function create(User $user): bool
@@ -54,17 +61,16 @@ class KelasPolicy
 
     public function viewKasTransaksi(User $user, Kelas $kelas): bool
     {
-        if ($user->role->value === 'super_admin') {
-            return true;
-        }
-        return $user->role->value === 'pengajar'
-            && $kelas->kelasGuru()
-                ->whereHas('pengajar', fn ($q) => $q->where('user_id', $user->id))
-                ->exists();
+        return $kelas->bisaKelolaKas($user);
     }
 
     public function catatKasTransaksi(User $user, Kelas $kelas): bool
     {
         return $this->viewKasTransaksi($user, $kelas);
+    }
+
+    public function managePengurus(User $user, Kelas $kelas): bool
+    {
+        return $user->role->value === 'super_admin';
     }
 }

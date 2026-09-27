@@ -53,6 +53,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('murid', MuridController::class);
     Route::get('murid/{murid}/dampak-hapus', [MuridController::class, 'deleteImpact']);
+    Route::post('murid/{murid}/akun', [MuridController::class, 'buatAkun']);
     Route::get('murid/{murid}/wali', [WaliMuridController::class, 'index']);
     Route::post('murid/{murid}/wali', [WaliMuridController::class, 'store']);
     Route::put('wali-murid/{waliMurid}', [WaliMuridController::class, 'update']);
@@ -62,6 +63,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('kelas/{kelas}/pengajar', [KelasController::class, 'pengajarIndex']);
     Route::post('kelas/{kelas}/pengajar', [KelasController::class, 'assignPengajar']);
     Route::delete('kelas/{kelas}/pengajar/{pengajar}', [KelasController::class, 'lepaskanPengajar'])->withTrashed();
+    Route::get('kelas/{kelas}/pengurus', [KelasController::class, 'pengurusIndex']);
+    Route::post('kelas/{kelas}/pengurus', [KelasController::class, 'assignPengurus']);
+    Route::delete('kelas/{kelas}/pengurus/{pengurus}', [KelasController::class, 'lepaskanPengurus']);
     Route::get('kelas/{kelas}/murid', [KelasController::class, 'muridIndex']);
     Route::post('kelas/{kelas}/murid', [KelasController::class, 'enrollMurid']);
     Route::delete('kelas/{kelas}/murid/{murid}', [KelasController::class, 'keluarkanMurid'])->withTrashed();

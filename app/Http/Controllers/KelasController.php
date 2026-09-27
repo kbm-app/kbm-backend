@@ -12,9 +12,12 @@ use App\Models\KelasGuru;
 use App\Models\MuridKelas;
 use App\Models\Pengajar;
 use App\Models\Murid;
+use App\Models\KelasPengurus;
+use App\Enums\JabatanPengurus;
 use App\Services\KelasService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class KelasController extends Controller
 {
@@ -38,6 +41,11 @@ class KelasController extends Controller
             $query->whereHas('kelasGuru', fn($q) =>
                 $q->whereHas('pengajar', fn($p) => $p->where('user_id', $user->id))
             );
+        }
+
+        // Murid hanya melihat kelas tempat ia menjadi pengurus
+        if ($user->role->value === 'murid') {
+            $query->dipegangPengurus($user, array_column(JabatanPengurus::cases(), 'value'));
         }
 
         return response()->json($query->orderBy('nama')->paginate(20));
@@ -106,6 +114,64 @@ class KelasController extends Controller
             ->delete();
 
         return response()->json(null, 204);
+    }
+
+    // --- Pengurus sub-resource ---
+
+    public function pengurusIndex(Kelas $kelas): JsonResponse
+    {
+        $this->authorize('view', $kelas);
+
+        return response()->json(['data' => $this->daftarPengurus($kelas)]);
+    }
+
+    public function assignPengurus(Request $request, Kelas $kelas): JsonResponse
+    {
+        $this->authorize('managePengurus', $kelas);
+
+        $data = $request->validate([
+            'murid_id' => [
+                'required',
+                Rule::exists('murid_kelas', 'murid_id')
+                    ->where('kelas_id', $kelas->id)
+                    ->where('status', 'aktif')
+                    ->whereNull('tanggal_keluar'),
+            ],
+            'jabatan'  => ['required', Rule::enum(JabatanPengurus::class)],
+        ], [
+            'murid_id.exists' => 'Murid harus terdaftar aktif di kelas ini.',
+        ]);
+
+        $sudahAda = $kelas->pengurus()
+            ->where('murid_id', $data['murid_id'])
+            ->where('jabatan', $data['jabatan'])
+            ->exists();
+        if ($sudahAda) {
+            return response()->json(['message' => 'Murid ini sudah memegang jabatan tersebut.'], 422);
+        }
+
+        $kelas->pengurus()->create($data);
+
+        return response()->json(['data' => $this->daftarPengurus($kelas)], 201);
+    }
+
+    public function lepaskanPengurus(Kelas $kelas, KelasPengurus $pengurus): JsonResponse
+    {
+        $this->authorize('managePengurus', $kelas);
+        abort_unless($pengurus->kelas_id === $kelas->id, 404);
+
+        $pengurus->delete();
+
+        return response()->json(null, 204);
+    }
+
+    private function daftarPengurus(Kelas $kelas)
+    {
+        return $kelas->pengurus()
+            ->with('murid:id,nama,user_id', 'murid.user:id,email,is_active')
+            ->get()
+            ->sortBy(fn ($p) => [array_search($p->jabatan, JabatanPengurus::cases()), $p->murid?->nama])
+            ->values();
     }
 
     // --- Murid sub-resource ---
