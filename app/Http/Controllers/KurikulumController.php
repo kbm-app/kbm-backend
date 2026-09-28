@@ -151,6 +151,8 @@ class KurikulumController extends Controller
                 'materi_umum' => $b->materi->map(fn ($m) => [
                     'id'                  => $m->id,
                     'judul'               => $m->judul,
+                    'sub_bab'             => $m->sub_bab,
+                    'target_bulan'        => $m->target_bulan,
                     'sudah_selesai'       => $selesaiIds->contains($m->id),
                     'dicatat_di_sesi_ini' => $dicatatDiSesiIni?->contains($m->id),
                     'metode'              => $penyampaian->get($m->id)?->metode,
