@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Events\PertemuanSelesai;
 use App\Models\AbsensiMurid;
 use App\Models\AbsensiPengajar;
+use App\Models\Jadwal;
 use App\Models\MuridKelas;
 use App\Models\Pertemuan;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -15,6 +17,8 @@ class AbsensiService
     public function bukaSesi(array $data): Pertemuan
     {
         if (!empty($data['jadwal_id'])) {
+            $this->pastikanJadwalCocok(Jadwal::findOrFail($data['jadwal_id']), $data);
+
             $sudahAda = Pertemuan::where('jadwal_id', $data['jadwal_id'])
                 ->where('tanggal', $data['tanggal'])
                 ->whereIn('status', ['berlangsung', 'selesai'])
@@ -59,6 +63,36 @@ class AbsensiService
 
             return $pertemuan->load(['kelas', 'program', 'pengajar.user', 'absensiMurid.murid', 'absensiPengajar']);
         });
+    }
+
+    /**
+     * Tanggal sesi harus sesuai jadwal yang dipilih: kelas sama, hari sama, masih dalam masa
+     * berlaku, dan untuk jadwal bulanan jatuh di minggu ke- yang benar. Sesi di luar jadwal
+     * (mis. sesi pengganti) dibuka tanpa memilih jadwal.
+     */
+    private function pastikanJadwalCocok(Jadwal $jadwal, array $data): void
+    {
+        $hariList = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];
+        $tanggal  = Carbon::parse($data['tanggal'])->startOfDay();
+        $hari     = $hariList[$tanggal->dayOfWeekIso - 1];
+
+        $error = match (true) {
+            $jadwal->kelas_id !== null && $jadwal->kelas_id !== (int) $data['kelas_id']
+                => 'Jadwal yang dipilih bukan milik kelas ini.',
+            $jadwal->hari !== $hari
+                => sprintf('Jadwal ini untuk hari %s, sedangkan tanggal yang dipilih hari %s.', ucfirst($jadwal->hari), ucfirst($hari)),
+            // Minggu ke- dihitung sama seperti "Jadwal Minggu Ini": ceil(tanggal / 7)
+            $jadwal->frekuensi === 'bulanan' && (int) ceil($tanggal->day / 7) !== $jadwal->minggu_ke
+                => sprintf('Jadwal ini hanya pada %s minggu ke-%d setiap bulan.', ucfirst($jadwal->hari), $jadwal->minggu_ke),
+            $tanggal->lt($jadwal->mulai_berlaku)
+                || ($jadwal->selesai_berlaku && $tanggal->gt($jadwal->selesai_berlaku))
+                => 'Tanggal yang dipilih di luar masa berlaku jadwal ini.',
+            default => null,
+        };
+
+        if ($error) {
+            throw ValidationException::withMessages(['tanggal' => $error]);
+        }
     }
 
     public function inputAbsensiBulk(Pertemuan $pertemuan, array $absensiData, int $pencatatId): void
