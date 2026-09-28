@@ -121,11 +121,17 @@ class AbsensiService
         );
     }
 
-    public function tutupSesi(Pertemuan $pertemuan): Pertemuan
+    public function tutupSesi(Pertemuan $pertemuan, string $jamSelesai): Pertemuan
     {
         if ($pertemuan->status !== 'berlangsung') {
             throw ValidationException::withMessages([
                 'status' => 'Sesi ini tidak sedang berlangsung.',
+            ]);
+        }
+
+        if ($jamSelesai <= substr($pertemuan->jam_mulai, 0, 5)) {
+            throw ValidationException::withMessages([
+                'jam_selesai' => 'Jam selesai harus setelah jam mulai (' . substr($pertemuan->jam_mulai, 0, 5) . ').',
             ]);
         }
 
@@ -145,7 +151,7 @@ class AbsensiService
 
         $pertemuan->update([
             'status'      => 'selesai',
-            'jam_selesai' => now()->format('H:i'),
+            'jam_selesai' => $jamSelesai,
         ]);
 
         event(new PertemuanSelesai($pertemuan));

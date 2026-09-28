@@ -133,11 +133,19 @@ class PertemuanController extends Controller
 
     // --- Selesai / Batalkan ---
 
-    public function selesai(Pertemuan $pertemuan): JsonResponse
+    public function selesai(Request $request, Pertemuan $pertemuan): JsonResponse
     {
         $this->authorize('tutupSesi', $pertemuan);
 
-        $pertemuan = $this->service->tutupSesi($pertemuan);
+        // Jam selesai diisi manual: sesi bisa ditutup belakangan (beda jam/tanggal dari sesi berlangsung)
+        $data = $request->validate([
+            'jam_selesai' => ['required', 'date_format:H:i'],
+        ], [
+            'jam_selesai.required'    => 'Jam selesai wajib diisi.',
+            'jam_selesai.date_format' => 'Format jam selesai: HH:MM.',
+        ]);
+
+        $pertemuan = $this->service->tutupSesi($pertemuan, $data['jam_selesai']);
         return response()->json(['pertemuan' => $pertemuan]);
     }
 
