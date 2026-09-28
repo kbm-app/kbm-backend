@@ -29,7 +29,7 @@ class Pengumuman extends Model
 
     public function pembuat(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'dibuat_oleh');
+        return $this->belongsTo(User::class, 'dibuat_oleh')->withTrashed();
     }
 
     public function kelas(): BelongsTo

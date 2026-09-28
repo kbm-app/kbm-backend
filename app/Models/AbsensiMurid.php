@@ -32,11 +32,11 @@ class AbsensiMurid extends Model
 
     public function murid(): BelongsTo
     {
-        return $this->belongsTo(Murid::class);
+        return $this->belongsTo(Murid::class)->withTrashed();
     }
 
     public function pencatat(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'dicatat_oleh');
+        return $this->belongsTo(User::class, 'dicatat_oleh')->withTrashed();
     }
 }

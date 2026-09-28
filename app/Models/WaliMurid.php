@@ -43,6 +43,6 @@ class WaliMurid extends Model
 
     public function murid(): BelongsTo
     {
-        return $this->belongsTo(Murid::class);
+        return $this->belongsTo(Murid::class)->withTrashed();
     }
 }

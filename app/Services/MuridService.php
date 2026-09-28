@@ -4,10 +4,10 @@ namespace App\Services;
 
 use App\Models\AbsensiMurid;
 use App\Models\KasTransaksi;
+use App\Models\KelasPengurus;
 use App\Models\Murid;
 use App\Models\MuridKelas;
 use App\Models\ProgressMateriMurid;
-use App\Models\WaliMurid;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -73,18 +73,17 @@ class MuridService
         ];
     }
 
+    /**
+     * Soft delete murid. Riwayat absensi, progress materi, kas, wali & foto tetap tersimpan;
+     * murid dikeluarkan dari kelas aktif (tanggal_keluar = hari ini) dan dari jabatan pengurus.
+     */
     public function delete(Murid $murid): void
     {
         DB::transaction(function () use ($murid) {
-            KasTransaksi::where('murid_id', $murid->id)->delete();
-            ProgressMateriMurid::where('murid_id', $murid->id)->delete();
-            AbsensiMurid::where('murid_id', $murid->id)->delete();
-            MuridKelas::where('murid_id', $murid->id)->delete();
-            WaliMurid::where('murid_id', $murid->id)->delete();
-
-            if ($murid->foto) {
-                Storage::disk('r2')->delete($murid->foto);
-            }
+            MuridKelas::where('murid_id', $murid->id)
+                ->whereNull('tanggal_keluar')
+                ->update(['tanggal_keluar' => now()->toDateString()]);
+            KelasPengurus::where('murid_id', $murid->id)->delete();
 
             $murid->delete();
         });

@@ -24,11 +24,11 @@ class AbsensiPengajar extends Model
 
     public function pengajar(): BelongsTo
     {
-        return $this->belongsTo(Pengajar::class);
+        return $this->belongsTo(Pengajar::class)->withTrashed();
     }
 
     public function pengganti(): BelongsTo
     {
-        return $this->belongsTo(Pengajar::class, 'pengganti_id');
+        return $this->belongsTo(Pengajar::class, 'pengganti_id')->withTrashed();
     }
 }

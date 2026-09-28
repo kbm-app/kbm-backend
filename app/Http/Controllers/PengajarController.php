@@ -5,11 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Pengajar\StorePengajarRequest;
 use App\Http\Requests\Pengajar\UpdatePengajarRequest;
 use App\Models\AbsensiPengajar;
-use App\Models\KelasGuru;
 use App\Models\Pengajar;
+use App\Services\PengajarService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class PengajarController extends Controller
 {
@@ -64,17 +63,11 @@ class PengajarController extends Controller
         ]);
     }
 
-    public function destroy(Pengajar $pengajar): JsonResponse
+    public function destroy(Pengajar $pengajar, PengajarService $service): JsonResponse
     {
         $this->authorize('delete', $pengajar);
 
-        DB::transaction(function () use ($pengajar) {
-            AbsensiPengajar::where('pengganti_id', $pengajar->id)->update(['pengganti_id' => null]);
-            AbsensiPengajar::where('pengajar_id', $pengajar->id)->delete();
-            KelasGuru::where('pengajar_id', $pengajar->id)->delete();
-
-            $pengajar->delete();
-        });
+        $service->hapus($pengajar);
 
         return response()->json(null, 204);
     }

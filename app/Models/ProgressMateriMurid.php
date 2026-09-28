@@ -32,7 +32,7 @@ class ProgressMateriMurid extends Model
 
     public function murid(): BelongsTo
     {
-        return $this->belongsTo(Murid::class);
+        return $this->belongsTo(Murid::class)->withTrashed();
     }
 
     public function pertemuan(): BelongsTo

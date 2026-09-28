@@ -59,7 +59,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('wali-murid/{waliMurid}', [WaliMuridController::class, 'update']);
     Route::delete('wali-murid/{waliMurid}', [WaliMuridController::class, 'destroy']);
 
-    Route::apiResource('kelas', KelasController::class);
+    // Tanpa parameters(), Laravel menyingkat {kelas} jadi {kela} dan binding ke Kelas $kelas gagal
+    Route::apiResource('kelas', KelasController::class)->parameters(['kelas' => 'kelas']);
     Route::get('kelas/{kelas}/pengajar', [KelasController::class, 'pengajarIndex']);
     Route::post('kelas/{kelas}/pengajar', [KelasController::class, 'assignPengajar']);
     Route::delete('kelas/{kelas}/pengajar/{pengajar}', [KelasController::class, 'lepaskanPengajar'])->withTrashed();

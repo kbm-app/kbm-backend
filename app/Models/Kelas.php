@@ -31,9 +31,10 @@ class Kelas extends Model
         ];
     }
 
+    /** Penugasan pengajar; pengajar yang sudah dihapus (soft delete) tidak ikut */
     public function kelasGuru(): HasMany
     {
-        return $this->hasMany(KelasGuru::class);
+        return $this->hasMany(KelasGuru::class)->whereHas('pengajar');
     }
 
     public function muridKelas(): HasMany

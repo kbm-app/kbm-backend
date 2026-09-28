@@ -58,6 +58,6 @@ class Jadwal extends Model
 
     public function pengajar(): BelongsTo
     {
-        return $this->belongsTo(Pengajar::class);
+        return $this->belongsTo(Pengajar::class)->withTrashed();
     }
 }

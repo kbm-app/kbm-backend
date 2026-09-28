@@ -5,9 +5,12 @@ namespace App\Http\Controllers;
 use App\Enums\UserRole;
 use App\Mail\ResetPasswordMail;
 use App\Mail\SetPasswordMail;
+use App\Models\Pengajar;
 use App\Models\User;
+use App\Services\PengajarService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
@@ -82,11 +85,18 @@ class UserController extends Controller
         return response()->json(['user' => $user->fresh()]);
     }
 
-    public function destroy(User $user): JsonResponse
+    public function destroy(User $user, PengajarService $pengajarService): JsonResponse
     {
         $this->authorize('delete', $user);
 
-        $user->delete();
+        // Soft delete: akun tidak bisa login lagi, tapi riwayat (pertemuan, absensi, dst) tetap utuh
+        DB::transaction(function () use ($user, $pengajarService) {
+            if ($pengajar = Pengajar::where('user_id', $user->id)->first()) {
+                $pengajarService->hapus($pengajar);
+            }
+            $user->tokens()->delete();
+            $user->delete();
+        });
 
         return response()->json(null, 204);
     }
