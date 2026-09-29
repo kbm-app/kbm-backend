@@ -157,8 +157,11 @@ class PertemuanController extends Controller
             return response()->json(['message' => 'Hanya sesi berlangsung yang bisa dibatalkan.'], 422);
         }
 
-        $pertemuan->update(['status' => 'batal', 'jam_selesai' => now()->format('H:i')]);
-        return response()->json(['pertemuan' => $pertemuan]);
+        // Sesi yang dibatalkan tidak disimpan: dihapus beserta absensi murid & pengajarnya (FK cascade).
+        // Progress materi individu & penyampaian materi umum tetap ada, pertemuan_id-nya menjadi null.
+        $pertemuan->delete();
+
+        return response()->json(null, 204);
     }
 
     // --- Rekap ---

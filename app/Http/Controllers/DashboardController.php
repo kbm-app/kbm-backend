@@ -79,6 +79,7 @@ class DashboardController extends Controller
         $distribusi = AbsensiMurid::whereHas('pertemuan', fn ($q) =>
             $q->whereMonth('tanggal', now()->month)
               ->whereYear('tanggal', now()->year)
+              ->where('status', 'selesai')
               ->when($kelasId, fn ($k) => $k->where('kelas_id', $kelasId))
         )
         ->selectRaw('status, COUNT(*) as jumlah')
@@ -339,7 +340,7 @@ class DashboardController extends Controller
         $tahun = now()->year;
 
         $total = AbsensiMurid::whereHas('pertemuan', fn ($q) =>
-            $q->whereMonth('tanggal', $bulan)->whereYear('tanggal', $tahun)
+            $q->whereMonth('tanggal', $bulan)->whereYear('tanggal', $tahun)->where('status', 'selesai')
         )->count();
 
         if ($total === 0) {
@@ -347,7 +348,7 @@ class DashboardController extends Controller
         }
 
         $hadir = AbsensiMurid::whereHas('pertemuan', fn ($q) =>
-            $q->whereMonth('tanggal', $bulan)->whereYear('tanggal', $tahun)
+            $q->whereMonth('tanggal', $bulan)->whereYear('tanggal', $tahun)->where('status', 'selesai')
         )->whereIn('status', ['hadir', 'terlambat'])->count();
 
         return round($hadir / $total * 100, 1);
