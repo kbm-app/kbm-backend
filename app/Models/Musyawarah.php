@@ -39,9 +39,20 @@ class Musyawarah extends Model
         return $this->belongsTo(User::class, 'created_by')->withTrashed();
     }
 
+    /**
+     * Laporan per kelas, selalu urut jenjang: usia minimal kelas termuda dulu, lalu nama
+     * (PAUD → Kelas 1 → … → Kelas 3-1 → Kelas 3-2 → … → Remaja). Tanpa ini urutan mengikuti
+     * urutan baris di database dan berubah-ubah setelah laporan di-regenerate.
+     */
     public function laporan(): HasMany
     {
-        return $this->hasMany(LaporanMusyawarah::class);
+        $kelasKolom = fn (string $kolom) => Kelas::withTrashed()
+            ->select($kolom)
+            ->whereColumn('kelas.id', 'laporan_musyawarah.kelas_id');
+
+        return $this->hasMany(LaporanMusyawarah::class)
+            ->orderBy($kelasKolom('rentang_usia_min'))
+            ->orderBy($kelasKolom('nama'));
     }
 
     public function notulensi(): HasMany
