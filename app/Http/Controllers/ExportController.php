@@ -327,7 +327,7 @@ class ExportController extends Controller
         $notulensiByKategori = $musyawarah->notulensi->groupBy('kategori');
 
         $bulanLabel = Carbon::createFromDate($musyawarah->tahun, $musyawarah->bulan, 1)
-            ->translatedFormat('F');
+            ->locale('id')->translatedFormat('F');
 
         $pdf = Pdf::loadView('pdf.musyawarah-notulensi', [
             'musyawarah'         => $musyawarah,

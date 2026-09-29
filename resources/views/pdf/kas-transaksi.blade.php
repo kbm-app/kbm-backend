@@ -2,11 +2,12 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
+@include('pdf.partials.font')
 <style>
   @page { margin: 15mm 18mm; }
   * { box-sizing: border-box; }
   body, h1, h2 { margin: 0; padding: 0; }
-  body { font-family: 'DejaVu Sans', sans-serif; font-size: 10px; color: #1e293b; }
+  body { font-family: 'Poppins', 'DejaVu Sans', sans-serif; font-size: 10px; color: #1e293b; }
 
   .header { text-align: center; padding-bottom: 12px; border-bottom: 2px solid #334155; margin-bottom: 10px; }
   .header h1 { font-size: 15px; font-weight: bold; letter-spacing: 0.5px; }
@@ -19,7 +20,7 @@
 
   table { width: 100%; border-collapse: collapse; }
   thead tr { background-color: #334155; color: #f8fafc; }
-  thead th { padding: 6px 7px; text-align: left; font-size: 9px; font-weight: 600; letter-spacing: 0.3px; }
+  thead th { padding: 6px 7px; text-align: left; font-size: 9px; font-weight: bold; letter-spacing: 0.3px; }
   tbody tr:nth-child(even) { background-color: #f8fafc; }
   tbody tr:nth-child(odd) { background-color: #ffffff; }
   tbody td { padding: 5px 7px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
@@ -27,10 +28,10 @@
   .text-right { text-align: right; }
   .text-center { text-align: center; }
 
-  .pemasukan { color: #166534; font-weight: 600; }
-  .pengeluaran { color: #991b1b; font-weight: 600; }
+  .pemasukan { color: #166534; font-weight: bold; }
+  .pengeluaran { color: #991b1b; font-weight: bold; }
 
-  .badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 8px; font-weight: 600; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 8px; font-weight: bold; }
   .badge-pemasukan  { background: #dcfce7; color: #166534; }
   .badge-pengeluaran { background: #fee2e2; color: #991b1b; }
 

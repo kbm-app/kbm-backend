@@ -2,11 +2,12 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
+@include('pdf.partials.font')
 <style>
   @page { margin: 15mm 18mm; }
   * { box-sizing: border-box; }
   body, h1, h2 { margin: 0; padding: 0; }
-  body { font-family: 'DejaVu Sans', sans-serif; font-size: 10px; color: #1e293b; }
+  body { font-family: 'Poppins', 'DejaVu Sans', sans-serif; font-size: 10px; color: #1e293b; }
 
   .header { text-align: center; padding-bottom: 12px; border-bottom: 2px solid #334155; margin-bottom: 10px; }
   .header h1 { font-size: 15px; font-weight: bold; letter-spacing: 0.5px; }
@@ -19,7 +20,7 @@
 
   table { width: 100%; border-collapse: collapse; }
   thead tr { background-color: #334155; color: #f8fafc; }
-  thead th { padding: 6px 7px; text-align: left; font-size: 9px; font-weight: 600; letter-spacing: 0.3px; }
+  thead th { padding: 6px 7px; text-align: left; font-size: 9px; font-weight: bold; letter-spacing: 0.3px; }
   thead th.text-center { text-align: center; }
   tbody tr:nth-child(even) { background-color: #f8fafc; }
   tbody tr:nth-child(odd) { background-color: #ffffff; }
@@ -32,13 +33,13 @@
   .pct-mid   { background: #f59e0b; }
   .pct-low   { background: #ef4444; }
 
-  .pct-text-high  { color: #166534; font-weight: 600; }
-  .pct-text-mid   { color: #854d0e; font-weight: 600; }
-  .pct-text-low   { color: #991b1b; font-weight: 600; }
+  .pct-text-high  { color: #166534; font-weight: bold; }
+  .pct-text-mid   { color: #854d0e; font-weight: bold; }
+  .pct-text-low   { color: #991b1b; font-weight: bold; }
 
-  .text-hadir      { color: #166534; font-weight: 600; }
+  .text-hadir      { color: #166534; font-weight: bold; }
   .text-terlambat  { color: #854d0e; }
-  .text-alpha      { color: #991b1b; font-weight: 600; }
+  .text-alpha      { color: #991b1b; font-weight: bold; }
 
   .footer { position: fixed; bottom: 0; width: 100%; border-top: 1px solid #e2e8f0; padding-top: 5px; display: flex; justify-content: space-between; font-size: 8px; color: #94a3b8; }
   .page-number:after { content: counter(page) " / " counter(pages); }
