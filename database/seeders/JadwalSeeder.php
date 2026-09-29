@@ -15,8 +15,8 @@ class JadwalSeeder extends Seeder
     public function run(): void
     {
         $jadwal = [
-            ['program' => 'Pengajian Rutin', 'kelas' => 'Kelas Pra-Remaja', 'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => 'rabu',   'jam_mulai' => '16:00', 'jam_selesai' => '17:30', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => null],
-            ['program' => 'Pengajian Rutin', 'kelas' => 'Kelas Remaja',    'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => 'kamis',  'jam_mulai' => '16:00', 'jam_selesai' => '17:30', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => null],
+            ['program' => 'Pengajian Rutin', 'kelas' => 'Kelas Pra-Remaja', 'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => 'rabu',   'jam_mulai' => '16:00', 'jam_selesai' => '17:30', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => '2026-09-28'],
+            ['program' => 'Pengajian Rutin', 'kelas' => 'Kelas Remaja',    'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => 'kamis',  'jam_mulai' => '16:00', 'jam_selesai' => '17:30', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => '2026-09-28'],
 
             // Pengajian Rutin Kelas 6 — jadwal lama, sudah ditutup (histori ganti jadwal)
             ['program' => 'Pengajian Rutin', 'kelas' => 'Kelas 6',         'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => 'senin',  'jam_mulai' => '15:00', 'jam_selesai' => '16:00', 'mulai_berlaku' => '2025-07-01', 'selesai_berlaku' => '2025-12-31'],
@@ -38,6 +38,14 @@ class JadwalSeeder extends Seeder
                 if ($baru) {
                     $jadwal[] = ['program' => 'Pengajian Rutin', 'kelas' => $kelas, 'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => $hari, 'jam_mulai' => $baru[0], 'jam_selesai' => $baru[1], 'mulai_berlaku' => '2026-09-26', 'selesai_berlaku' => null];
                 }
+            }
+        }
+
+        // Pengajian Rutin Pra-Remaja & Remaja — ba'da maghrib Senin–Sabtu mulai 29 Sep 2026
+        // (19:00–21:00; Selasa & Kamis sampai 20:00). Jadwal lama Rabu/Kamis 16:00 ditutup 28 Sep 2026.
+        foreach (['Kelas Pra-Remaja', 'Kelas Remaja'] as $kelas) {
+            foreach (['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'] as $hari) {
+                $jadwal[] = ['program' => 'Pengajian Rutin', 'kelas' => $kelas, 'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => $hari, 'jam_mulai' => '19:00', 'jam_selesai' => in_array($hari, ['selasa', 'kamis']) ? '20:00' : '21:00', 'mulai_berlaku' => '2026-09-29', 'selesai_berlaku' => null];
             }
         }
 
