@@ -187,7 +187,7 @@
         <th class="center" style="width: 70px;">Kehadiran</th>
         <th class="center" style="width: 70px;">Materi Umum</th>
         <th class="center" style="width: 70px;">Materi Individu</th>
-        <th class="center" style="width: 76px;">Keseluruhan</th>
+        <th class="center" style="width: 76px;">Materi Keseluruhan</th>
       </tr>
     </thead>
     <tbody>
