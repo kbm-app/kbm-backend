@@ -54,6 +54,9 @@ class JadwalSeeder extends Seeder
             $jadwal[] = ['program' => 'Pengajian Rutin', 'kelas' => 'Kelas Usman', 'frekuensi' => 'mingguan', 'minggu_ke' => null, 'hari' => $hari, 'jam_mulai' => '20:30', 'jam_selesai' => '21:30', 'mulai_berlaku' => '2026-07-01', 'selesai_berlaku' => null];
         }
 
+        // Pengajian Usman ke rumah jamaah — bulanan, Sabtu (malam Minggu) minggu ke-3
+        $jadwal[] = ['program' => 'Pengajian Rutin', 'kelas' => 'Kelas Usman', 'frekuensi' => 'bulanan', 'minggu_ke' => 3, 'hari' => 'sabtu', 'jam_mulai' => '19:00', 'jam_selesai' => '21:00', 'mulai_berlaku' => '2026-09-29', 'selesai_berlaku' => null];
+
         foreach ($jadwal as $item) {
             $program = Program::where('nama', $item['program'])->first();
             $kelas   = Kelas::where('nama', $item['kelas'])->first();
