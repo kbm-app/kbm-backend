@@ -82,6 +82,14 @@ class MuridController extends Controller
         return response()->json(['murid' => $murid]);
     }
 
+    public function dampakTanggalMasuk(Request $request, Murid $murid): JsonResponse
+    {
+        $this->authorize('update', $murid);
+        $request->validate(['tanggal_masuk' => ['required', 'date']]);
+
+        return response()->json($this->muridService->dampakTanggalMasuk($murid, $request->input('tanggal_masuk')));
+    }
+
     public function deleteImpact(Murid $murid): JsonResponse
     {
         $this->authorize('delete', $murid);

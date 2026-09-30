@@ -53,6 +53,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('murid', MuridController::class);
     Route::get('murid/{murid}/dampak-hapus', [MuridController::class, 'deleteImpact']);
+    Route::get('murid/{murid}/dampak-tanggal-masuk', [MuridController::class, 'dampakTanggalMasuk']);
     Route::post('murid/{murid}/akun', [MuridController::class, 'buatAkun']);
     Route::get('murid/{murid}/wali', [WaliMuridController::class, 'index']);
     Route::post('murid/{murid}/wali', [WaliMuridController::class, 'store']);
@@ -95,6 +96,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('pertemuan/{pertemuan}/absensi', [PertemuanController::class, 'absensiIndex']);
     Route::post('pertemuan/{pertemuan}/absensi', [PertemuanController::class, 'absensiBulk']);
     Route::put('absensi-murid/{absensiMurid}', [PertemuanController::class, 'absensiUpdate']);
+    Route::post('pertemuan/{pertemuan}/sinkron-murid', [PertemuanController::class, 'sinkronMurid']);
 
     Route::post('pertemuan/{pertemuan}/absensi-pengajar', [PertemuanController::class, 'absensiPengajarStore']);
     Route::put('pertemuan/{pertemuan}/absensi-pengajar', [PertemuanController::class, 'absensiPengajarStore']);

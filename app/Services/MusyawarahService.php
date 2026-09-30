@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\AbsensiMurid;
 use App\Models\Kelas;
 use App\Models\Kurikulum;
 use App\Models\LaporanMusyawarah;
@@ -11,6 +10,7 @@ use App\Models\MuridKelas;
 use App\Models\Pertemuan;
 use App\Models\PenyampaianMateri;
 use App\Models\ProgressMateriMurid;
+use Illuminate\Support\Collection;
 
 class MusyawarahService
 {
@@ -60,40 +60,17 @@ class MusyawarahService
 
     private function hitungKehadiranRataRata(int $kelasId, int $bulan, int $tahun): ?float
     {
-        $pertemuanIds = Pertemuan::selesai()
-            ->where('kelas_id', $kelasId)
-            ->whereMonth('tanggal', $bulan)
-            ->whereYear('tanggal', $tahun)
-            ->pluck('id');
-
-        $totalPertemuan = $pertemuanIds->count();
-        if ($totalPertemuan === 0) {
+        $pertemuan = $this->pertemuanSelesai($kelasId, $bulan, $tahun);
+        $muridIds  = $this->muridAktifIds($kelasId);
+        if ($pertemuan->isEmpty() || $muridIds->isEmpty()) {
             return null;
         }
 
-        $muridIds = MuridKelas::where('kelas_id', $kelasId)
-            ->where('status', 'aktif')
-            ->whereNull('tanggal_keluar')
-            ->pluck('murid_id');
+        // Rata-rata persentase murid; murid yang baru masuk setelah periode ini (0 pertemuan) tidak dihitung
+        $rekap = app(AbsensiService::class)->rekapKehadiranPerMurid($kelasId, $pertemuan, $muridIds)
+            ->filter(fn ($r) => $r['total_pertemuan'] > 0);
 
-        if ($muridIds->isEmpty()) {
-            return null;
-        }
-
-        $hadirPerMurid = AbsensiMurid::whereIn('pertemuan_id', $pertemuanIds)
-            ->whereIn('murid_id', $muridIds)
-            ->whereIn('status', ['hadir', 'terlambat'])
-            ->selectRaw('murid_id, count(*) as total')
-            ->groupBy('murid_id')
-            ->pluck('total', 'murid_id');
-
-        $totalPersen = 0;
-        foreach ($muridIds as $muridId) {
-            $hadir = $hadirPerMurid->get($muridId, 0);
-            $totalPersen += ($hadir / $totalPertemuan) * 100;
-        }
-
-        return round($totalPersen / $muridIds->count(), 1);
+        return $rekap->isEmpty() ? null : round($rekap->avg('persentase'), 1);
     }
 
     private function hitungProgressKurikulum(int $kelasId, int $bulan, int $tahun): array
@@ -155,6 +132,24 @@ class MusyawarahService
         return ['umum' => $progressUmum, 'individu' => $progressIndividu, 'keseluruhan' => $keseluruhan];
     }
 
+    /** Pertemuan selesai sebuah kelas di bulan tertentu (id & tanggal) */
+    private function pertemuanSelesai(int $kelasId, int $bulan, int $tahun): Collection
+    {
+        return Pertemuan::selesai()
+            ->where('kelas_id', $kelasId)
+            ->whereMonth('tanggal', $bulan)
+            ->whereYear('tanggal', $tahun)
+            ->get(['id', 'tanggal']);
+    }
+
+    private function muridAktifIds(int $kelasId): Collection
+    {
+        return MuridKelas::where('kelas_id', $kelasId)
+            ->where('status', 'aktif')
+            ->whereNull('tanggal_keluar')
+            ->pluck('murid_id');
+    }
+
     private function bulanIndonesia(int $n): string
     {
         return ['januari','februari','maret','april','mei','juni',
@@ -163,43 +158,24 @@ class MusyawarahService
 
     private function generateNarasiKendalaMurid(int $kelasId, int $bulan, int $tahun): ?string
     {
-        $pertemuanIds = Pertemuan::selesai()
-            ->where('kelas_id', $kelasId)
-            ->whereMonth('tanggal', $bulan)
-            ->whereYear('tanggal', $tahun)
-            ->pluck('id');
-
-        $totalPertemuan = $pertemuanIds->count();
-        if ($totalPertemuan === 0) {
+        $pertemuan = $this->pertemuanSelesai($kelasId, $bulan, $tahun);
+        if ($pertemuan->isEmpty()) {
             return null;
         }
 
-        $muridAktif = MuridKelas::with('murid')
-            ->where('kelas_id', $kelasId)
-            ->where('status', 'aktif')
-            ->whereNull('tanggal_keluar')
-            ->get();
-
-        $absensiPerMurid = AbsensiMurid::whereIn('pertemuan_id', $pertemuanIds)
-            ->whereIn('murid_id', $muridAktif->pluck('murid_id'))
-            ->get()
-            ->groupBy('murid_id');
+        // Persentase tiap murid dihitung sejak absensi pertamanya di kelas ini
+        $rekap = app(AbsensiService::class)->rekapKehadiranPerMurid($kelasId, $pertemuan, $this->muridAktifIds($kelasId));
 
         $muridBermasalah = [];
 
-        foreach ($muridAktif as $mk) {
-            $absensi = $absensiPerMurid->get($mk->murid_id, collect());
-
-            $hadir  = $absensi->whereIn('status', ['hadir', 'terlambat'])->count();
-            $alpha  = $absensi->where('status', 'alpha')->count();
-            $persen = round(($hadir / $totalPertemuan) * 100, 1);
-
-            if ($persen < self::THRESHOLD_KEHADIRAN) {
+        foreach ($rekap as $r) {
+            if ($r['total_pertemuan'] > 0 && $r['persentase'] < self::THRESHOLD_KEHADIRAN) {
                 $muridBermasalah[] = [
-                    'nama'   => $mk->murid->nama,
-                    'persen' => $persen,
-                    'hadir'  => $hadir,
-                    'alpha'  => $alpha,
+                    'nama'   => $r['nama'],
+                    'persen' => $r['persentase'],
+                    'hadir'  => $r['hadir'] + $r['terlambat'],
+                    'alpha'  => $r['alpha'],
+                    'total'  => $r['total_pertemuan'],
                 ];
             }
         }
@@ -210,7 +186,7 @@ class MusyawarahService
 
         $jumlah = count($muridBermasalah);
         $baris  = array_map(
-            fn ($m) => "- {$m['nama']} ({$m['persen']}%) — {$m['hadir']}x hadir, {$m['alpha']}x alpha",
+            fn ($m) => "- {$m['nama']} ({$m['persen']}%) — {$m['hadir']}x hadir dari {$m['total']} pertemuan, {$m['alpha']}x alpha",
             $muridBermasalah
         );
 

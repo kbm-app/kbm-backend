@@ -15,7 +15,7 @@ class UpdateAbsensiMuridRequest extends FormRequest
     {
         return [
             'status'  => ['required', 'in:hadir,izin,sakit,alpha,terlambat'],
-            'catatan' => ['nullable', 'string', 'max:500'],
+            'keterangan' => ['nullable', 'string', 'max:500'],
         ];
     }
 }

@@ -10,6 +10,7 @@ use App\Models\MuridKelas;
 use App\Models\ProgressMateriMurid;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class MuridService
 {
@@ -41,9 +42,56 @@ class MuridService
         });
     }
 
+    /**
+     * Absensi murid yang jatuh sebelum $tanggalMasuk — yang akan dihapus bila tanggal bergabung
+     * diubah ke tanggal tsb (mis. murid ternyata baru bergabung di tengah bulan).
+     */
+    public function dampakTanggalMasuk(Murid $murid, string $tanggalMasuk): array
+    {
+        $absensi = AbsensiMurid::where('murid_id', $murid->id)
+            ->whereHas('pertemuan', fn ($q) => $q->where('tanggal', '<', $tanggalMasuk))
+            ->with('pertemuan:id,tanggal,kelas_id', 'pertemuan.kelas:id,nama')
+            ->get();
+
+        $tanggal = $absensi->map(fn ($a) => $a->pertemuan->tanggal->toDateString())->sort()->values();
+
+        return [
+            'jumlah'     => $absensi->count(),
+            'dari'       => $tanggal->first(),
+            'sampai'     => $tanggal->last(),
+            'per_status' => $absensi->countBy('status'),
+            'kelas'      => $absensi->pluck('pertemuan.kelas.nama')->unique()->values(),
+        ];
+    }
+
     public function update(Murid $murid, array $data): Murid
     {
-        return DB::transaction(function () use ($murid, $data) {
+        $hapusAbsensi = (bool) ($data['hapus_absensi_sebelum_masuk'] ?? false);
+        unset($data['hapus_absensi_sebelum_masuk']);
+
+        // Tanggal bergabung dimundurkan melewati absensi yang sudah ada → wajib konfirmasi hapus
+        $tanggalBaru = $data['tanggal_masuk'] ?? null;
+        $berubah     = $tanggalBaru && $tanggalBaru !== $murid->tanggal_masuk?->toDateString();
+        $dampak      = $berubah ? $this->dampakTanggalMasuk($murid, $tanggalBaru) : ['jumlah' => 0];
+        if ($dampak['jumlah'] > 0 && ! $hapusAbsensi) {
+            throw ValidationException::withMessages([
+                'tanggal_masuk' => "Ada {$dampak['jumlah']} absensi ({$dampak['dari']} s/d {$dampak['sampai']}) sebelum tanggal bergabung ini. Konfirmasi penghapusan absensi tersebut terlebih dahulu.",
+            ]);
+        }
+
+        return DB::transaction(function () use ($murid, $data, $dampak, $tanggalBaru) {
+            if ($dampak['jumlah'] > 0) {
+                AbsensiMurid::where('murid_id', $murid->id)
+                    ->whereHas('pertemuan', fn ($q) => $q->where('tanggal', '<', $tanggalBaru))
+                    ->delete();
+
+                // Tanggal masuk kelas aktif ikut disesuaikan agar tidak lebih awal dari tanggal bergabung
+                MuridKelas::where('murid_id', $murid->id)
+                    ->whereNull('tanggal_keluar')
+                    ->where('tanggal_masuk', '<', $tanggalBaru)
+                    ->update(['tanggal_masuk' => $tanggalBaru]);
+            }
+
             if (isset($data['foto']) && $data['foto'] instanceof \Illuminate\Http\UploadedFile) {
                 if ($murid->foto) {
                     Storage::disk('r2')->delete($murid->foto);

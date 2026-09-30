@@ -58,6 +58,16 @@ class PertemuanPolicy
         return $pertemuan->kelas->bisaKelolaAbsensi($user);
     }
 
+    /** Sesi berlangsung: pengelola absensi kelas; sesi selesai: hanya super admin (koreksi). */
+    public function sinkronMurid(User $user, Pertemuan $pertemuan): bool
+    {
+        return match ($pertemuan->status) {
+            'berlangsung' => $pertemuan->kelas->bisaKelolaAbsensi($user),
+            'selesai'     => $user->role->value === 'super_admin',
+            default       => false,
+        };
+    }
+
     public function viewRekap(User $user): bool
     {
         return $this->bolehAksesAbsensi($user);

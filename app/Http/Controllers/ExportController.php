@@ -10,7 +10,6 @@ use App\Exports\MuridTemplateExport;
 use App\Exports\PengajarExport;
 use App\Exports\PengajarTemplateExport;
 use App\Exports\ProgramExport;
-use App\Models\AbsensiMurid;
 use App\Models\Kelas;
 use App\Models\KasTransaksi;
 use App\Models\MuridKelas;
@@ -18,6 +17,7 @@ use App\Models\Murid;
 use App\Models\Musyawarah;
 use App\Models\Pengajar;
 use App\Models\Pertemuan;
+use App\Services\AbsensiService;
 use App\Models\Program;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -223,36 +223,16 @@ class ExportController extends Controller
         $bulan = (int) $request->bulan;
         $tahun = (int) $request->tahun;
 
-        $pertemuanIds = Pertemuan::selesai()
+        $pertemuan = Pertemuan::selesai()
             ->where('kelas_id', $kelas->id)
             ->whereMonth('tanggal', $bulan)
             ->whereYear('tanggal', $tahun)
-            ->pluck('id');
+            ->get(['id', 'tanggal']);
 
-        $totalPertemuan = $pertemuanIds->count();
+        $totalPertemuan = $pertemuan->count();
 
-        $rekap = AbsensiMurid::whereIn('pertemuan_id', $pertemuanIds)
-            ->with('murid')
-            ->get()
-            ->groupBy('murid_id')
-            ->map(function ($items) use ($totalPertemuan) {
-                $murid  = $items->first()->murid;
-                $counts = $items->countBy('status');
-                $hadir  = ($counts['hadir'] ?? 0) + ($counts['terlambat'] ?? 0);
-
-                return [
-                    'nama'            => $murid->nama,
-                    'hadir'           => $counts['hadir'] ?? 0,
-                    'terlambat'       => $counts['terlambat'] ?? 0,
-                    'izin'            => $counts['izin'] ?? 0,
-                    'sakit'           => $counts['sakit'] ?? 0,
-                    'alpha'           => $counts['alpha'] ?? 0,
-                    'total_pertemuan' => $totalPertemuan,
-                    'persentase'      => $totalPertemuan > 0
-                        ? round(($hadir / $totalPertemuan) * 100, 1)
-                        : 0,
-                ];
-            })
+        // Persentase tiap murid dihitung sejak absensi pertamanya di kelas ini
+        $rekap = app(AbsensiService::class)->rekapKehadiranPerMurid($kelas->id, $pertemuan)
             ->sortByDesc('hadir')
             ->values();
 

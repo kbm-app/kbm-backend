@@ -2,9 +2,9 @@
 
 namespace App\Exports;
 
-use App\Models\AbsensiMurid;
 use App\Models\Kelas;
 use App\Models\Pertemuan;
+use App\Services\AbsensiService;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -36,37 +36,16 @@ class AbsensiRekapExport implements FromCollection, WithHeadings, WithStyles, Sh
 
     public function collection(): Collection
     {
-        $pertemuanIds = Pertemuan::selesai()
+        $pertemuan = Pertemuan::selesai()
             ->where('kelas_id', $this->kelas->id)
             ->whereMonth('tanggal', $this->bulan)
             ->whereYear('tanggal', $this->tahun)
-            ->pluck('id');
+            ->get(['id', 'tanggal']);
 
-        $this->totalPertemuan = $pertemuanIds->count();
-        $totalPertemuan = $this->totalPertemuan;
+        $this->totalPertemuan = $pertemuan->count();
 
-        $rekap = AbsensiMurid::whereIn('pertemuan_id', $pertemuanIds)
-            ->with('murid')
-            ->get()
-            ->groupBy('murid_id')
-            ->map(function ($items) use ($totalPertemuan) {
-                $murid  = $items->first()->murid;
-                $counts = $items->countBy('status');
-                $hadir  = ($counts['hadir'] ?? 0) + ($counts['terlambat'] ?? 0);
-
-                return [
-                    'nama'            => $murid->nama,
-                    'hadir'           => $counts['hadir'] ?? 0,
-                    'terlambat'       => $counts['terlambat'] ?? 0,
-                    'izin'            => $counts['izin'] ?? 0,
-                    'sakit'           => $counts['sakit'] ?? 0,
-                    'alpha'           => $counts['alpha'] ?? 0,
-                    'total_pertemuan' => $totalPertemuan,
-                    'persentase'      => $totalPertemuan > 0
-                        ? round(($hadir / $totalPertemuan) * 100, 1)
-                        : 0,
-                ];
-            })
+        // Persentase tiap murid dihitung sejak absensi pertamanya di kelas ini
+        $rekap = app(AbsensiService::class)->rekapKehadiranPerMurid($this->kelas->id, $pertemuan)
             ->sortByDesc('hadir')
             ->values();
 

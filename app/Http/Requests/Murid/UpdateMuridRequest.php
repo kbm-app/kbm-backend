@@ -24,6 +24,8 @@ class UpdateMuridRequest extends FormRequest
             'tanggal_lahir' => ['required', 'date'],
             'alamat'        => ['nullable', 'string'],
             'tanggal_masuk' => ['nullable', 'date'],
+            // Konfirmasi hapus absensi sebelum tanggal bergabung baru (lihat GET murid/{id}/dampak-tanggal-masuk)
+            'hapus_absensi_sebelum_masuk' => ['sometimes', 'boolean'],
             'status'        => ['in:aktif,nonaktif,alumni,pindah'],
             'foto'          => ['nullable', 'image', 'max:2048'],
         ];

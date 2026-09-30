@@ -6,9 +6,11 @@ use App\Events\PertemuanSelesai;
 use App\Models\AbsensiMurid;
 use App\Models\AbsensiPengajar;
 use App\Models\Jadwal;
+use App\Models\Murid;
 use App\Models\MuridKelas;
 use App\Models\Pertemuan;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -34,11 +36,8 @@ class AbsensiService
         return DB::transaction(function () use ($data) {
             $pertemuan = Pertemuan::create($data);
 
-            // Buat draft absensi untuk semua murid aktif di kelas ini (default alpha)
-            $muridIds = MuridKelas::where('kelas_id', $data['kelas_id'])
-                ->where('status', 'aktif')
-                ->whereNull('tanggal_keluar')
-                ->pluck('murid_id');
+            // Buat draft absensi untuk semua peserta sesi (default alpha)
+            $muridIds = $this->pesertaSesi($pertemuan);
 
             $now = now();
             $drafts = $muridIds->map(fn ($muridId) => [
@@ -135,17 +134,13 @@ class AbsensiService
             ]);
         }
 
-        // Validasi semua murid sudah punya absensi
-        $totalMurid = MuridKelas::where('kelas_id', $pertemuan->kelas_id)
-            ->where('status', 'aktif')
-            ->whereNull('tanggal_keluar')
-            ->count();
+        // Validasi semua peserta sesi sudah punya absensi (murid yang didaftarkan setelah sesi
+        // dibuka belum punya baris absensi → tambahkan dulu lewat "Perbarui daftar murid")
+        $belumAda = $this->pesertaSesi($pertemuan)->diff($pertemuan->absensiMurid()->pluck('murid_id'));
 
-        $totalAbsensi = $pertemuan->absensiMurid()->count();
-
-        if ($totalMurid !== $totalAbsensi) {
+        if ($belumAda->isNotEmpty()) {
             throw ValidationException::withMessages([
-                'absensi' => 'Semua murid harus sudah memiliki status absensi sebelum sesi ditutup.',
+                'absensi' => "Ada {$belumAda->count()} murid yang belum ada di daftar absensi. Klik \"Perbarui daftar murid\" lalu isi statusnya.",
             ]);
         }
 
@@ -157,6 +152,98 @@ class AbsensiService
         event(new PertemuanSelesai($pertemuan));
 
         return $pertemuan->fresh(['kelas', 'program', 'pengajar.user', 'absensiMurid.murid', 'absensiPengajar']);
+    }
+
+    /**
+     * Peserta sebuah sesi: murid aktif di kelasnya yang sudah bergabung pada tanggal sesi
+     * (tanggal bergabung kosong dianggap sudah bergabung).
+     */
+    public function pesertaSesi(Pertemuan $pertemuan): Collection
+    {
+        return MuridKelas::where('kelas_id', $pertemuan->kelas_id)
+            ->where('status', 'aktif')
+            ->whereNull('tanggal_keluar')
+            ->whereHas('murid', fn ($q) => $q->where(fn ($q) => $q
+                ->whereNull('tanggal_masuk')
+                ->orWhere('tanggal_masuk', '<=', $pertemuan->tanggal->toDateString())))
+            ->pluck('murid_id')
+            ->unique()
+            ->values();
+    }
+
+    /**
+     * Tambahkan peserta sesi yang belum ada di daftar absensi (mis. murid baru didaftarkan setelah
+     * sesi dibuka) dengan status awal alpha. Absensi yang sudah terisi tidak diubah sama sekali.
+     *
+     * @return Collection<int, string> nama murid yang ditambahkan
+     */
+    public function sinkronMurid(Pertemuan $pertemuan, int $pencatatId): Collection
+    {
+        $baru = $this->pesertaSesi($pertemuan)->diff($pertemuan->absensiMurid()->pluck('murid_id'))->values();
+
+        if ($baru->isNotEmpty()) {
+            $now = now();
+            AbsensiMurid::insertOrIgnore($baru->map(fn ($muridId) => [
+                'pertemuan_id' => $pertemuan->id,
+                'murid_id'     => $muridId,
+                'status'       => 'alpha',
+                'dicatat_oleh' => $pencatatId,
+                'created_at'   => $now,
+                'updated_at'   => $now,
+            ])->all());
+        }
+
+        return Murid::whereIn('id', $baru)->orderBy('nama')->pluck('nama');
+    }
+
+    /**
+     * Rekap kehadiran per murid di satu kelas untuk sekumpulan pertemuan (mis. satu bulan).
+     * Untuk tiap murid, pertemuan dihitung sejak absensi pertamanya di kelas itu, agar murid yang
+     * baru bergabung tidak dianggap absen di pertemuan sebelum ia masuk. Murid tanpa absensi sama
+     * sekali di kelas itu dihitung terhadap seluruh pertemuan.
+     *
+     * @param  Collection<int, Pertemuan>  $pertemuan  pertemuan periode (butuh id & tanggal)
+     * @param  Collection<int, int>|null  $muridIds  batasi ke murid tertentu (mis. murid aktif); null = murid yang punya absensi
+     * @return Collection<int, array> per murid_id
+     */
+    public function rekapKehadiranPerMurid(int $kelasId, Collection $pertemuan, ?Collection $muridIds = null): Collection
+    {
+        $absensi = AbsensiMurid::whereIn('pertemuan_id', $pertemuan->pluck('id'))
+            ->when($muridIds, fn ($q) => $q->whereIn('murid_id', $muridIds))
+            ->get(['pertemuan_id', 'murid_id', 'status'])
+            ->groupBy('murid_id');
+
+        $ids = ($muridIds ?? $absensi->keys())->values();
+
+        $mulai = AbsensiMurid::join('pertemuan', 'pertemuan.id', '=', 'absensi_murid.pertemuan_id')
+            ->where('pertemuan.kelas_id', $kelasId)
+            ->whereIn('absensi_murid.murid_id', $ids)
+            ->groupBy('absensi_murid.murid_id')
+            ->selectRaw('absensi_murid.murid_id, min(pertemuan.tanggal) as mulai')
+            ->pluck('mulai', 'murid_id');
+
+        $nama = Murid::withTrashed()->whereIn('id', $ids)->pluck('nama', 'id');
+
+        return $ids->mapWithKeys(function ($muridId) use ($absensi, $mulai, $nama, $pertemuan) {
+            $counts = $absensi->get($muridId, collect())->countBy('status');
+            $hadir  = ($counts['hadir'] ?? 0) + ($counts['terlambat'] ?? 0);
+            $sejak  = $mulai->get($muridId);
+            $total  = $sejak
+                ? $pertemuan->filter(fn ($p) => $p->tanggal->toDateString() >= substr($sejak, 0, 10))->count()
+                : $pertemuan->count();
+
+            return [$muridId => [
+                'murid_id'        => $muridId,
+                'nama'            => $nama->get($muridId),
+                'hadir'           => $counts['hadir'] ?? 0,
+                'terlambat'       => $counts['terlambat'] ?? 0,
+                'izin'            => $counts['izin'] ?? 0,
+                'sakit'           => $counts['sakit'] ?? 0,
+                'alpha'           => $counts['alpha'] ?? 0,
+                'total_pertemuan' => $total,
+                'persentase'      => $total > 0 ? round(($hadir / $total) * 100, 1) : 0,
+            ]];
+        });
     }
 
     public function hitungPersentaseKehadiran(int $muridId, int $bulan, int $tahun): float

@@ -111,8 +111,22 @@ class PertemuanController extends Controller
     public function absensiUpdate(UpdateAbsensiMuridRequest $request, AbsensiMurid $absensiMurid): JsonResponse
     {
         // Authorization handled by UpdateAbsensiMuridRequest (super_admin only)
-        $absensiMurid->update($request->validated());
+        $data = $request->validated();
+        $absensiMurid->update([
+            'status'       => $data['status'],
+            'catatan'      => array_key_exists('keterangan', $data) ? $data['keterangan'] : $absensiMurid->catatan,
+            'dicatat_oleh' => $request->user()->id,
+        ]);
         return response()->json(['absensi' => $absensiMurid->load('murid')]);
+    }
+
+    public function sinkronMurid(Request $request, Pertemuan $pertemuan): JsonResponse
+    {
+        $this->authorize('sinkronMurid', $pertemuan);
+
+        $ditambahkan = $this->service->sinkronMurid($pertemuan, $request->user()->id);
+
+        return response()->json(['ditambahkan' => $ditambahkan]);
     }
 
     // --- Absensi Pengajar ---
@@ -180,38 +194,16 @@ class PertemuanController extends Controller
             abort_unless(Kelas::findOrFail($request->kelas_id)->bisaKelolaAbsensi($request->user()), 403);
         }
 
-        $pertemuanIds = Pertemuan::selesai()
+        $pertemuan = Pertemuan::selesai()
             ->where('kelas_id', $request->kelas_id)
             ->whereMonth('tanggal', $request->bulan)
             ->whereYear('tanggal', $request->tahun)
-            ->pluck('id');
+            ->get(['id', 'tanggal']);
 
-        $totalPertemuan = $pertemuanIds->count();
+        $totalPertemuan = $pertemuan->count();
 
-        $rekap = AbsensiMurid::whereIn('pertemuan_id', $pertemuanIds)
-            ->with('murid')
-            ->get()
-            ->groupBy('murid_id')
-            ->map(function ($items) use ($totalPertemuan) {
-                $murid = $items->first()->murid;
-                $counts = $items->countBy('status');
-                $hadir = ($counts['hadir'] ?? 0) + ($counts['terlambat'] ?? 0);
-
-                return [
-                    'murid_id'        => $murid->id,
-                    'nama'            => $murid->nama,
-                    'hadir'           => $counts['hadir'] ?? 0,
-                    'terlambat'       => $counts['terlambat'] ?? 0,
-                    'izin'            => $counts['izin'] ?? 0,
-                    'sakit'           => $counts['sakit'] ?? 0,
-                    'alpha'           => $counts['alpha'] ?? 0,
-                    'total_pertemuan' => $totalPertemuan,
-                    'persentase'      => $totalPertemuan > 0
-                        ? round(($hadir / $totalPertemuan) * 100, 1)
-                        : 0,
-                ];
-            })
-            ->values();
+        // Persentase tiap murid dihitung sejak absensi pertamanya di kelas ini
+        $rekap = $this->service->rekapKehadiranPerMurid((int) $request->kelas_id, $pertemuan)->values();
 
         return response()->json([
             'data'            => $rekap,
