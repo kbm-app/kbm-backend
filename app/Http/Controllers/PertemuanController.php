@@ -16,6 +16,7 @@ use App\Services\AbsensiService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class PertemuanController extends Controller
@@ -28,7 +29,7 @@ class PertemuanController extends Controller
 
         $user = $request->user();
 
-        $query = Pertemuan::with(['kelas', 'program', 'pengajar.user'])
+        $query = Pertemuan::with(['kelas', 'program', 'pengajar.user', 'absensiPengajar.pengajar.user', 'absensiPengajar.pengganti.user'])
             ->withCount(['absensiMurid as total_murid'])
             ->withCount(['absensiMurid as total_hadir' => fn ($q) => $q->whereIn('status', ['hadir', 'terlambat'])])
             ->withCount(['absensiMurid as total_alpha' => fn ($q) => $q->where('status', 'alpha')])
@@ -155,14 +156,48 @@ class PertemuanController extends Controller
     {
         $this->authorize('inputAbsensi', $pertemuan);
 
-        $data = array_merge($request->validated(), ['pengajar_id' => $pertemuan->pengajar_id]);
+        // Tambah pengajar ke sesi (baris baru) atau ubah status pengajar yang sudah bertugas
+        $data = $request->validated();
+        if (($data['status'] ?? null) !== 'digantikan') {
+            $data['pengganti_id'] = null;
+        }
+
+        // Pengajar baru di sesi harus pengajar kelas; pengganti boleh dari luar kelas
+        $sudahBertugas = $pertemuan->absensiPengajar()->where('pengajar_id', $data['pengajar_id'])->exists();
+        if (!$sudahBertugas) {
+            $pertemuan->kelas->pastikanPengajarKelas([$data['pengajar_id']], 'pengajar_id');
+        }
 
         $absensi = AbsensiPengajar::updateOrCreate(
-            ['pertemuan_id' => $pertemuan->id],
+            ['pertemuan_id' => $pertemuan->id, 'pengajar_id' => $data['pengajar_id']],
             $data
         );
 
         return response()->json(['absensi_pengajar' => $absensi->load(['pengajar.user', 'pengganti.user'])]);
+    }
+
+    /** Lepas satu pengajar dari sesi; minimal satu pengajar harus tersisa. */
+    public function absensiPengajarDestroy(Pertemuan $pertemuan, AbsensiPengajar $absensiPengajar): JsonResponse
+    {
+        $this->authorize('inputAbsensi', $pertemuan);
+        abort_unless($absensiPengajar->pertemuan_id === $pertemuan->id, 404);
+
+        $sisa = $pertemuan->absensiPengajar()->whereKeyNot($absensiPengajar->id)->first();
+        if (!$sisa) {
+            throw ValidationException::withMessages([
+                'pengajar_id' => 'Sesi harus memiliki minimal satu pengajar.',
+            ]);
+        }
+
+        DB::transaction(function () use ($pertemuan, $absensiPengajar, $sisa) {
+            $absensiPengajar->delete();
+            // Pengajar utama sesi ikut berpindah bila yang dilepas adalah pengajar utama
+            if ($pertemuan->pengajar_id === $absensiPengajar->pengajar_id) {
+                $pertemuan->update(['pengajar_id' => $sisa->pengajar_id]);
+            }
+        });
+
+        return response()->json(null, 204);
     }
 
     // --- Selesai / Batalkan ---

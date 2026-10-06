@@ -102,6 +102,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('pertemuan/{pertemuan}/absensi-pengajar', [PertemuanController::class, 'absensiPengajarStore']);
     Route::put('pertemuan/{pertemuan}/absensi-pengajar', [PertemuanController::class, 'absensiPengajarStore']);
+    Route::delete('pertemuan/{pertemuan}/absensi-pengajar/{absensiPengajar}', [PertemuanController::class, 'absensiPengajarDestroy']);
 
     // Libur
     Route::get('libur', [LiburController::class, 'index']);

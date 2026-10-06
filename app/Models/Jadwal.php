@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Jadwal extends Model
 {
@@ -13,7 +14,6 @@ class Jadwal extends Model
     protected $fillable = [
         'program_id',
         'kelas_id',
-        'pengajar_id',
         'frekuensi',
         'minggu_ke',
         'hari',
@@ -56,8 +56,9 @@ class Jadwal extends Model
         return $this->belongsTo(Kelas::class);
     }
 
-    public function pengajar(): BelongsTo
+    /** Semua pengajar jadwal ini; yang bertugas di tiap sesi dipilih saat buka sesi. */
+    public function pengajar(): BelongsToMany
     {
-        return $this->belongsTo(Pengajar::class)->withTrashed();
+        return $this->belongsToMany(Pengajar::class, 'jadwal_pengajar')->withTimestamps()->withTrashed();
     }
 }

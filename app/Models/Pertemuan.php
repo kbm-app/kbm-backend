@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Pertemuan extends Model
 {
@@ -77,8 +76,9 @@ class Pertemuan extends Model
         return $this->hasMany(AbsensiMurid::class)->orderBy('murid_id');
     }
 
-    public function absensiPengajar(): HasOne
+    /** Satu baris per pengajar yang bertugas di sesi ini */
+    public function absensiPengajar(): HasMany
     {
-        return $this->hasOne(AbsensiPengajar::class);
+        return $this->hasMany(AbsensiPengajar::class)->orderBy('id');
     }
 }

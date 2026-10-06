@@ -31,7 +31,8 @@ class KelasController extends Controller
 
         $query = Kelas::withCount(['muridAktif as murid_aktif_count'])
             ->with([
-                'kelasGuru' => fn($q) => $q->where('peran', 'utama')->with('pengajar.user'),
+                // Semua guru kelas, pengajar utama lebih dulu
+                'kelasGuru' => fn($q) => $q->orderByRaw("CASE WHEN peran = 'utama' THEN 0 ELSE 1 END")->orderBy('id')->with('pengajar.user'),
             ])
             ->when($request->search, fn($q) => $q->where('nama', 'ilike', "%{$request->search}%"))
             ->when($request->has('is_aktif'), fn($q) => $q->where('is_aktif', $request->boolean('is_aktif')));

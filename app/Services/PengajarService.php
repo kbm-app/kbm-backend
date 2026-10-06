@@ -16,9 +16,11 @@ class PengajarService
     public function hapus(Pengajar $pengajar): void
     {
         DB::transaction(function () use ($pengajar) {
-            Jadwal::where('pengajar_id', $pengajar->id)
-                ->where(fn ($q) => $q->whereNull('selesai_berlaku')->orWhere('selesai_berlaku', '>=', now()->toDateString()))
-                ->update(['pengajar_id' => null]);
+            $jadwalBerlaku = Jadwal::where(fn ($q) => $q
+                ->whereNull('selesai_berlaku')
+                ->orWhere('selesai_berlaku', '>=', now()->toDateString()))
+                ->pluck('id');
+            $pengajar->jadwal()->detach($jadwalBerlaku);
 
             $pengajar->delete();
         });

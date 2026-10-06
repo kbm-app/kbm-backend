@@ -18,10 +18,13 @@ class JadwalService
             'selesai_berlaku' => $mulai->copy()->subDay()->toDateString(),
         ]);
 
-        return Jadwal::create([
+        // Pengajar ikut jadwal lama kecuali dikirim ulang
+        $pengajarIds = $dataBaru['pengajar_ids'] ?? $lama->pengajar()->pluck('pengajar.id')->all();
+        unset($dataBaru['pengajar_ids']);
+
+        $baru = Jadwal::create([
             'program_id'  => $lama->program_id,
             'kelas_id'    => $lama->kelas_id,
-            'pengajar_id' => $lama->pengajar_id,
             'frekuensi'   => $lama->frekuensi,
             'minggu_ke'   => $lama->minggu_ke,
             'hari'        => $lama->hari,
@@ -30,6 +33,9 @@ class JadwalService
             ...$dataBaru,
             'mulai_berlaku' => $mulai->toDateString(),
         ]);
+        $baru->pengajar()->sync($pengajarIds);
+
+        return $baru;
     }
 
     public function getAktif(?int $kelasId = null): Collection

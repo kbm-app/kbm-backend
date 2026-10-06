@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\JabatanPengurus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -35,6 +37,27 @@ class Kelas extends Model
     public function kelasGuru(): HasMany
     {
         return $this->hasMany(KelasGuru::class)->whereHas('pengajar');
+    }
+
+    /** ID pengajar yang ditugaskan di kelas ini (utama maupun asisten). */
+    public function pengajarIds(): Collection
+    {
+        return $this->kelasGuru()->pluck('pengajar_id')->unique()->values();
+    }
+
+    /**
+     * Tolak pengajar yang belum ditugaskan di kelas ini.
+     *
+     * @param  int[]  $pengajarIds
+     */
+    public function pastikanPengajarKelas(array $pengajarIds, string $field = 'pengajar_ids'): void
+    {
+        $bukanPengajarKelas = collect($pengajarIds)->diff($this->pengajarIds());
+        if ($bukanPengajarKelas->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                $field => "Pengajar harus yang sudah ditugaskan di kelas {$this->nama}.",
+            ]);
+        }
     }
 
     public function muridKelas(): HasMany

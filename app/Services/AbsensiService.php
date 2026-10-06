@@ -6,6 +6,7 @@ use App\Events\PertemuanSelesai;
 use App\Models\AbsensiMurid;
 use App\Models\AbsensiPengajar;
 use App\Models\Jadwal;
+use App\Models\Kelas;
 use App\Models\Libur;
 use App\Models\Murid;
 use App\Models\MuridKelas;
@@ -42,7 +43,12 @@ class AbsensiService
             }
         }
 
-        return DB::transaction(function () use ($data) {
+        $pengajarIds = array_values(array_unique($data['pengajar_ids']));
+        unset($data['pengajar_ids']);
+        Kelas::findOrFail($data['kelas_id'])->pastikanPengajarKelas($pengajarIds);
+        $data['pengajar_id'] = $pengajarIds[0];
+
+        return DB::transaction(function () use ($data, $pengajarIds) {
             $pertemuan = Pertemuan::create($data);
 
             // Buat draft absensi untuk semua peserta sesi (default alpha)
@@ -62,12 +68,14 @@ class AbsensiService
                 AbsensiMurid::insert($drafts);
             }
 
-            // Buat absensi pengajar default hadir
-            AbsensiPengajar::create([
-                'pertemuan_id' => $pertemuan->id,
-                'pengajar_id'  => $data['pengajar_id'],
-                'status'       => 'hadir',
-            ]);
+            // Absensi pengajar default hadir untuk setiap pengajar yang bertugas
+            foreach ($pengajarIds as $pengajarId) {
+                AbsensiPengajar::create([
+                    'pertemuan_id' => $pertemuan->id,
+                    'pengajar_id'  => $pengajarId,
+                    'status'       => 'hadir',
+                ]);
+            }
 
             return $pertemuan->load(['kelas', 'program', 'pengajar.user', 'absensiMurid.murid', 'absensiPengajar']);
         });

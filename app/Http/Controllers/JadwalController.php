@@ -47,8 +47,12 @@ class JadwalController extends Controller
         if (empty($data['mulai_berlaku'])) {
             $data['mulai_berlaku'] = now()->toDateString();
         }
+        $pengajarIds = $data['pengajar_ids'] ?? [];
+        unset($data['pengajar_ids']);
+        $this->pastikanPengajarKelas($data['kelas_id'] ?? null, $pengajarIds);
 
         $jadwal = Jadwal::create($data);
+        $jadwal->pengajar()->sync($pengajarIds);
         return response()->json(['jadwal' => $jadwal->load(['program', 'kelas', 'pengajar.user'])], 201);
     }
 
@@ -60,7 +64,14 @@ class JadwalController extends Controller
 
     public function update(UpdateJadwalRequest $request, Jadwal $jadwal): JsonResponse
     {
-        $jadwal->update($request->validated());
+        $data = $request->validated();
+        if (array_key_exists('pengajar_ids', $data)) {
+            $kelasId = array_key_exists('kelas_id', $data) ? $data['kelas_id'] : $jadwal->kelas_id;
+            $this->pastikanPengajarKelas($kelasId, $data['pengajar_ids'] ?? []);
+            $jadwal->pengajar()->sync($data['pengajar_ids'] ?? []);
+            unset($data['pengajar_ids']);
+        }
+        $jadwal->update($data);
         return response()->json(['jadwal' => $jadwal->load(['program', 'kelas', 'pengajar.user'])]);
     }
 
@@ -78,12 +89,20 @@ class JadwalController extends Controller
         $validated = $request->validate([
             'program_id'      => ['sometimes', 'integer', 'exists:program,id'],
             'kelas_id'        => ['nullable', 'integer', 'exists:kelas,id'],
-            'pengajar_id'     => ['nullable', 'integer', 'exists:pengajar,id'],
+            'pengajar_ids'    => ['sometimes', 'nullable', 'array'],
+            'pengajar_ids.*'  => ['integer', 'distinct', 'exists:pengajar,id'],
+            'frekuensi'       => ['sometimes', 'in:mingguan,bulanan'],
+            'minggu_ke'       => ['nullable', 'integer', 'min:1', 'max:4', 'required_if:frekuensi,bulanan'],
             'hari'            => ['sometimes', 'in:senin,selasa,rabu,kamis,jumat,sabtu,minggu'],
             'jam_mulai'       => ['sometimes', 'date_format:H:i'],
             'jam_selesai'     => ['sometimes', 'date_format:H:i'],
             'mulai_berlaku'   => ['sometimes', 'date', 'after_or_equal:today'],
         ]);
+
+        if (array_key_exists('pengajar_ids', $validated)) {
+            $kelasId = array_key_exists('kelas_id', $validated) ? $validated['kelas_id'] : $jadwal->kelas_id;
+            $this->pastikanPengajarKelas($kelasId, $validated['pengajar_ids'] ?? []);
+        }
 
         $baru = $this->service->ganti($jadwal, $validated);
         return response()->json(['jadwal' => $baru->load(['program', 'kelas', 'pengajar.user'])], 201);
@@ -128,5 +147,13 @@ class JadwalController extends Controller
         });
 
         return response()->json(['data' => $result]);
+    }
+
+    /** Jadwal untuk satu kelas hanya boleh diampu pengajar kelas itu; jadwal semua kelas bebas. */
+    private function pastikanPengajarKelas(?int $kelasId, array $pengajarIds): void
+    {
+        if ($kelasId && $pengajarIds) {
+            Kelas::findOrFail($kelasId)->pastikanPengajarKelas($pengajarIds);
+        }
     }
 }

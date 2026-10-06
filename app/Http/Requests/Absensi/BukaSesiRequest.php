@@ -18,12 +18,22 @@ class BukaSesiRequest extends FormRequest
         return $kelas !== null && $kelas->bisaKelolaAbsensi($this->user());
     }
 
+    public function messages(): array
+    {
+        return [
+            'pengajar_ids.required' => 'Pilih minimal satu pengajar yang bertugas.',
+            'pengajar_ids.min'      => 'Pilih minimal satu pengajar yang bertugas.',
+        ];
+    }
+
     public function rules(): array
     {
         return [
             'kelas_id'   => ['required', 'integer', 'exists:kelas,id'],
             'program_id' => ['required', 'integer', 'exists:program,id'],
-            'pengajar_id' => ['required', 'integer', 'exists:pengajar,id'],
+            // Pengajar yang bertugas di sesi ini; yang pertama menjadi pengajar utama sesi
+            'pengajar_ids'   => ['required', 'array', 'min:1'],
+            'pengajar_ids.*' => ['integer', 'distinct', 'exists:pengajar,id'],
             'jadwal_id'  => ['nullable', 'integer', 'exists:jadwal,id'],
             'tanggal'    => ['required', 'date'],
             'jam_mulai'  => ['required', 'date_format:H:i'],

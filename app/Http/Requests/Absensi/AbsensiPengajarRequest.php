@@ -15,8 +15,9 @@ class AbsensiPengajarRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'pengajar_id'  => ['required', 'integer', 'exists:pengajar,id'],
             'status'       => ['required', 'in:hadir,berhalangan,digantikan'],
-            'pengganti_id' => ['nullable', 'integer', 'exists:pengajar,id', 'required_if:status,digantikan'],
+            'pengganti_id' => ['nullable', 'integer', 'exists:pengajar,id', 'required_if:status,digantikan', 'different:pengajar_id'],
             'keterangan'   => ['nullable', 'string', 'max:500'],
         ];
     }
