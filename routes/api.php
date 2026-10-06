@@ -87,6 +87,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Absensi
     Route::get('rekap/absensi-murid', [PertemuanController::class, 'rekapMurid']);
     Route::get('murid/{muridId}/rekap-absensi', [PertemuanController::class, 'rekapSatuMurid']);
+    Route::get('murid/{muridId}/tren-kehadiran', [PertemuanController::class, 'trenSatuMurid']);
 
     Route::apiResource('pertemuan', PertemuanController::class)->except(['store']);
     Route::post('pertemuan', [PertemuanController::class, 'store']);

@@ -13,6 +13,7 @@ use App\Models\Kelas;
 use App\Models\Murid;
 use App\Models\Pertemuan;
 use App\Services\AbsensiService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -214,19 +215,39 @@ class PertemuanController extends Controller
         }
 
         $pertemuan = Pertemuan::selesai()
+            ->with('program:id,nama')
             ->where('kelas_id', $request->kelas_id)
             ->whereMonth('tanggal', $request->bulan)
             ->whereYear('tanggal', $request->tahun)
-            ->get(['id', 'tanggal']);
+            ->orderBy('tanggal')
+            ->orderBy('jam_mulai')
+            ->get(['id', 'tanggal', 'jam_mulai', 'program_id']);
 
         $totalPertemuan = $pertemuan->count();
 
         // Persentase tiap murid dihitung sejak absensi pertamanya di kelas ini
-        $rekap = $this->service->rekapKehadiranPerMurid((int) $request->kelas_id, $pertemuan)->values();
+        $rekap = $this->service->rekapKehadiranPerMurid((int) $request->kelas_id, $pertemuan);
+
+        // Status per sesi untuk tampilan matriks (buku absen): murid_id => [pertemuan_id => status]
+        $statusPerSesi = AbsensiMurid::whereIn('pertemuan_id', $pertemuan->pluck('id'))
+            ->get(['pertemuan_id', 'murid_id', 'status'])
+            ->groupBy('murid_id')
+            ->map(fn ($rows) => $rows->pluck('status', 'pertemuan_id'));
+
+        $data = $rekap->map(fn ($item, $muridId) => $item + [
+            // Selalu objek JSON (bukan array), juga saat kosong
+            'status_per_sesi' => (object) $statusPerSesi->get($muridId, collect())->all(),
+        ])->values();
 
         return response()->json([
-            'data'            => $rekap,
+            'data'            => $data,
             'total_pertemuan' => $totalPertemuan,
+            'pertemuan'       => $pertemuan->map(fn ($p) => [
+                'id'        => $p->id,
+                'tanggal'   => $p->tanggal->toDateString(),
+                'jam_mulai' => substr($p->jam_mulai, 0, 5),
+                'program'   => $p->program?->nama,
+            ])->values(),
         ]);
     }
 
@@ -254,5 +275,48 @@ class PertemuanController extends Controller
             'persentase' => $persentase,
             'data'       => $absensi,
         ]);
+    }
+
+    /**
+     * Persentase kehadiran satu murid per bulan, untuk `jumlah` bulan yang berakhir di bulan/tahun
+     * yang diminta. Dihitung dengan aturan yang sama dengan rekapSatuMurid (sesi selesai saja).
+     */
+    public function trenSatuMurid(Request $request, int $muridId): JsonResponse
+    {
+        $this->authorize('view', Murid::findOrFail($muridId));
+
+        $request->validate([
+            'bulan'  => ['required', 'integer', 'min:1', 'max:12'],
+            'tahun'  => ['required', 'integer', 'min:2020'],
+            'jumlah' => ['nullable', 'integer', 'min:1', 'max:12'],
+        ]);
+
+        $jumlah = $request->integer('jumlah', 6);
+        $akhir  = Carbon::create($request->tahun, $request->bulan, 1)->endOfMonth();
+        $awal   = $akhir->copy()->startOfMonth()->subMonths($jumlah - 1);
+
+        $absensi = AbsensiMurid::where('murid_id', $muridId)
+            ->join('pertemuan', 'pertemuan.id', '=', 'absensi_murid.pertemuan_id')
+            ->where('pertemuan.status', 'selesai')
+            ->whereBetween('pertemuan.tanggal', [$awal->toDateString(), $akhir->toDateString()])
+            ->get(['pertemuan.tanggal', 'absensi_murid.status'])
+            ->groupBy(fn ($row) => substr((string) $row->tanggal, 0, 7));
+
+        $tren = collect(range(0, $jumlah - 1))->map(function ($i) use ($awal, $absensi) {
+            $bulan = $awal->copy()->addMonths($i);
+            $rows  = $absensi->get($bulan->format('Y-m'), collect());
+            $total = $rows->count();
+            $hadir = $rows->whereIn('status', ['hadir', 'terlambat'])->count();
+
+            return [
+                'bulan'      => $bulan->month,
+                'tahun'      => $bulan->year,
+                'total'      => $total,
+                'hadir'      => $hadir,
+                'persentase' => $total > 0 ? round(($hadir / $total) * 100, 1) : null,
+            ];
+        });
+
+        return response()->json(['data' => $tren]);
     }
 }
