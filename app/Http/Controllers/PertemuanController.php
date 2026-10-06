@@ -15,6 +15,7 @@ use App\Models\Pertemuan;
 use App\Services\AbsensiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class PertemuanController extends Controller
 {
@@ -71,7 +72,25 @@ class PertemuanController extends Controller
     {
         $this->authorize('update', $pertemuan);
 
-        $pertemuan->update($request->validated());
+        $data = $request->validated();
+
+        if (isset($data['jam_mulai']) || isset($data['jam_selesai'])) {
+            if ($pertemuan->status !== 'selesai') {
+                throw ValidationException::withMessages([
+                    'jam_mulai' => 'Jam sesi hanya bisa dikoreksi pada sesi yang sudah selesai.',
+                ]);
+            }
+
+            $jamMulai   = $data['jam_mulai'] ?? substr($pertemuan->jam_mulai, 0, 5);
+            $jamSelesai = $data['jam_selesai'] ?? substr((string) $pertemuan->jam_selesai, 0, 5);
+            if ($jamSelesai <= $jamMulai) {
+                throw ValidationException::withMessages([
+                    'jam_selesai' => "Jam selesai harus setelah jam mulai ({$jamMulai}).",
+                ]);
+            }
+        }
+
+        $pertemuan->update($data);
         return response()->json(['pertemuan' => $pertemuan]);
     }
 

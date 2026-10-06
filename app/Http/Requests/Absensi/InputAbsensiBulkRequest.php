@@ -18,7 +18,7 @@ class InputAbsensiBulkRequest extends FormRequest
             'absensi'              => ['required', 'array', 'min:1'],
             'absensi.*.murid_id'   => ['required', 'integer', 'exists:murid,id'],
             'absensi.*.status'     => ['required', 'in:hadir,izin,sakit,alpha,terlambat'],
-            'absensi.*.catatan'    => ['nullable', 'string', 'max:500'],
+            'absensi.*.keterangan' => ['nullable', 'string', 'max:500'],
         ];
     }
 }

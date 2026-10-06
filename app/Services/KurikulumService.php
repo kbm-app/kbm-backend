@@ -163,4 +163,11 @@ class KurikulumService
 
         return $penyampaian;
     }
+
+    public function batalkanPenyampaian(Materi $materi, int $pertemuanId): void
+    {
+        PenyampaianMateri::where('materi_id', $materi->id)
+            ->where('pertemuan_id', $pertemuanId)
+            ->delete();
+    }
 }

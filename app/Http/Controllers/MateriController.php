@@ -100,6 +100,23 @@ class MateriController extends Controller
         ]);
     }
 
+    /**
+     * Batalkan penyampaian materi umum yang tercatat di satu sesi (koreksi). Penyampaian yang
+     * tercatat di sesi lain atau tanpa sesi tidak tersentuh.
+     */
+    public function batalkanUmum(Request $request, Materi $materi): JsonResponse
+    {
+        $this->authorize('manageProgress', $materi->kurikulum);
+
+        $data = $request->validate([
+            'pertemuan_id' => ['required', 'integer', 'exists:pertemuan,id'],
+        ]);
+
+        $this->service->batalkanPenyampaian($materi, (int) $data['pertemuan_id']);
+
+        return response()->json(null, 204);
+    }
+
     public function progressBulan(Kurikulum $kurikulum, string $bulan): JsonResponse
     {
         $this->authorize('view', $kurikulum);

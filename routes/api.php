@@ -125,6 +125,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('materi/{materi}', [MateriController::class, 'destroy']);
     Route::post('kurikulum/{kurikulum}/materi/urutan', [MateriController::class, 'reorder']);
     Route::post('materi/{materi}/selesai-umum', [MateriController::class, 'selesaikanUmum']);
+    Route::delete('materi/{materi}/selesai-umum', [MateriController::class, 'batalkanUmum']);
     Route::get('kurikulum/{kurikulum}/materi/bulan/{bulan}', [MateriController::class, 'progressBulan']);
 
     // Progress

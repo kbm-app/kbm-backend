@@ -33,7 +33,7 @@ class PertemuanPolicy
 
     public function update(User $user, Pertemuan $pertemuan): bool
     {
-        return $pertemuan->kelas->bisaKelolaAbsensi($user);
+        return $this->bolehUbahSesi($user, $pertemuan);
     }
 
     // Hapus sesi tetap hanya untuk super admin & pengajar kelas
@@ -50,7 +50,7 @@ class PertemuanPolicy
 
     public function inputAbsensi(User $user, Pertemuan $pertemuan): bool
     {
-        return $pertemuan->kelas->bisaKelolaAbsensi($user);
+        return $this->bolehUbahSesi($user, $pertemuan);
     }
 
     public function tutupSesi(User $user, Pertemuan $pertemuan): bool
@@ -58,8 +58,13 @@ class PertemuanPolicy
         return $pertemuan->kelas->bisaKelolaAbsensi($user);
     }
 
-    /** Sesi berlangsung: pengelola absensi kelas; sesi selesai: hanya super admin (koreksi). */
     public function sinkronMurid(User $user, Pertemuan $pertemuan): bool
+    {
+        return $this->bolehUbahSesi($user, $pertemuan);
+    }
+
+    /** Sesi berlangsung: pengelola absensi kelas; sesi selesai: hanya super admin (koreksi). */
+    private function bolehUbahSesi(User $user, Pertemuan $pertemuan): bool
     {
         return match ($pertemuan->status) {
             'berlangsung' => $pertemuan->kelas->bisaKelolaAbsensi($user),
