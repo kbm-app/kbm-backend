@@ -6,6 +6,7 @@ use App\Events\PertemuanSelesai;
 use App\Models\AbsensiMurid;
 use App\Models\AbsensiPengajar;
 use App\Models\Jadwal;
+use App\Models\Libur;
 use App\Models\Murid;
 use App\Models\MuridKelas;
 use App\Models\Pertemuan;
@@ -29,6 +30,14 @@ class AbsensiService
             if ($sudahAda) {
                 throw ValidationException::withMessages([
                     'jadwal_id' => 'Jadwal ini sudah memiliki sesi pada tanggal tersebut.',
+                ]);
+            }
+
+            // Sesi tanpa jadwal (mis. sesi pengganti) tetap boleh dibuka di hari libur
+            $libur = Libur::untukSesi((int) $data['kelas_id'], (int) $data['jadwal_id'], $data['tanggal'])->first();
+            if ($libur) {
+                throw ValidationException::withMessages([
+                    'tanggal' => "Jadwal ini diliburkan pada tanggal tersebut ({$libur->keterangan}). Hapus liburnya dulu bila sesi tetap diadakan.",
                 ]);
             }
         }
@@ -69,7 +78,7 @@ class AbsensiService
      * berlaku, dan untuk jadwal bulanan jatuh di minggu ke- yang benar. Sesi di luar jadwal
      * (mis. sesi pengganti) dibuka tanpa memilih jadwal.
      */
-    private function pastikanJadwalCocok(Jadwal $jadwal, array $data): void
+    public function pastikanJadwalCocok(Jadwal $jadwal, array $data): void
     {
         $hariList = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];
         $tanggal  = Carbon::parse($data['tanggal'])->startOfDay();

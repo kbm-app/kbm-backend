@@ -9,6 +9,7 @@ use App\Http\Controllers\KasTransaksiController;
 use App\Http\Controllers\JadwalController;
 use App\Http\Controllers\KelasController;
 use App\Http\Controllers\KurikulumController;
+use App\Http\Controllers\LiburController;
 use App\Http\Controllers\MateriController;
 use App\Http\Controllers\MuridController;
 use App\Http\Controllers\PengajarController;
@@ -101,6 +102,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('pertemuan/{pertemuan}/absensi-pengajar', [PertemuanController::class, 'absensiPengajarStore']);
     Route::put('pertemuan/{pertemuan}/absensi-pengajar', [PertemuanController::class, 'absensiPengajarStore']);
+
+    // Libur
+    Route::get('libur', [LiburController::class, 'index']);
+    Route::post('libur', [LiburController::class, 'store']);
+    Route::delete('libur/{libur}', [LiburController::class, 'destroy']);
 
     // Kurikulum
     // Harus sebelum {kurikulum} agar 'aktif-kelas' tidak ditangkap sebagai param
