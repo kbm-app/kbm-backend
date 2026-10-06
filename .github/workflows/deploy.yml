@@ -48,7 +48,15 @@ jobs:
       # when a container is (re)created. `restart` reuses the existing container
       # and its already-materialized environment, so a change to .env (e.g. new
       # MAIL_* credentials) would silently keep running with stale values.
+      #
+      # `up -d` only recreates a container when its config changed, so on a normal
+      # code-only deploy the start chain (and its `migrate --force`) does NOT run.
+      # Migrations are therefore run explicitly against the running container, and
+      # queue workers are told to restart so they pick up the new code. Fails the
+      # job if a migration fails, instead of leaving the schema silently behind.
       - name: Restart containers on VPS
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "cd /var/www/kbm/deploy && docker compose -p kbm up -d app queue web"
+            "set -e && cd /var/www/kbm/deploy && docker compose -p kbm up -d app queue web && \
+             docker compose -p kbm exec -T app php artisan migrate --force && \
+             docker compose -p kbm exec -T app php artisan queue:restart"
