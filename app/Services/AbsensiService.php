@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
 
 class AbsensiService
 {
-    public function bukaSesi(array $data): Pertemuan
+    public function bukaSesi(array $data, int $pencatatId): Pertemuan
     {
         if (!empty($data['jadwal_id'])) {
             $this->pastikanJadwalCocok(Jadwal::findOrFail($data['jadwal_id']), $data);
@@ -48,7 +48,7 @@ class AbsensiService
         Kelas::findOrFail($data['kelas_id'])->pastikanPengajarKelas($pengajarIds);
         $data['pengajar_id'] = $pengajarIds[0];
 
-        return DB::transaction(function () use ($data, $pengajarIds) {
+        return DB::transaction(function () use ($data, $pengajarIds, $pencatatId) {
             $pertemuan = Pertemuan::create($data);
 
             // Buat draft absensi untuk semua peserta sesi (default alpha)
@@ -59,7 +59,8 @@ class AbsensiService
                 'pertemuan_id' => $pertemuan->id,
                 'murid_id'     => $muridId,
                 'status'       => 'alpha',
-                'dicatat_oleh' => $data['pengajar_id'] ?? null,
+                // User yang membuka sesi (bukan ID pengajar — kolom ini merujuk ke tabel users)
+                'dicatat_oleh' => $pencatatId,
                 'created_at'   => $now,
                 'updated_at'   => $now,
             ])->values()->all();

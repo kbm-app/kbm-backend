@@ -49,7 +49,7 @@ class PertemuanController extends Controller
 
     public function store(BukaSesiRequest $request): JsonResponse
     {
-        $pertemuan = $this->service->bukaSesi($request->validated());
+        $pertemuan = $this->service->bukaSesi($request->validated(), $request->user()->id);
         return response()->json(['pertemuan' => $pertemuan], 201);
     }
 
