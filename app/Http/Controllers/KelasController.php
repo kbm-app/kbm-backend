@@ -89,7 +89,7 @@ class KelasController extends Controller
 
     public function pengajarIndex(Request $request, Kelas $kelas): JsonResponse
     {
-        $this->authorize('view', $kelas);
+        $this->authorize('viewPengajar', $kelas);
 
         $query = $kelas->kelasGuru()->with('pengajar.user');
 

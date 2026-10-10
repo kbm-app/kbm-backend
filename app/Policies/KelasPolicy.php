@@ -34,6 +34,12 @@ class KelasPolicy
             || Kelas::whereKey($kelas->id)->aksesJadwal($user)->exists();
     }
 
+    // Ketua & penerobos memilih pengajar yang bertugas saat membuka sesi kelasnya
+    public function viewPengajar(User $user, Kelas $kelas): bool
+    {
+        return $this->view($user, $kelas) || $kelas->bisaKelolaAbsensi($user);
+    }
+
     public function create(User $user): bool
     {
         return $user->role->value === 'super_admin';
