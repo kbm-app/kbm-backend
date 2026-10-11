@@ -21,13 +21,16 @@ class LiburController extends Controller
         $request->validate([
             'dari'     => ['required', 'date'],
             'sampai'   => ['required', 'date', 'after_or_equal:dari'],
-            'kelas_id' => ['nullable', 'integer'],
+            // Satu kelas atau beberapa kelas (kelas_id[]=...)
+            'kelas_id'   => ['nullable'],
+            'kelas_id.*' => ['integer'],
         ]);
+        $kelasIds = array_map('intval', (array) $request->kelas_id);
 
         $libur = Libur::with(['kelas:id,nama', 'jadwal.program:id,nama'])
             ->beririsan($request->dari, $request->sampai)
-            ->when($request->kelas_id, fn ($q, $kelasId) => $q
-                ->where(fn ($q) => $q->whereNull('kelas_id')->orWhere('kelas_id', $kelasId)))
+            ->when($kelasIds, fn ($q) => $q
+                ->where(fn ($q) => $q->whereNull('kelas_id')->orWhereIn('kelas_id', $kelasIds)))
             ->orderBy('tanggal_mulai')
             ->get();
 
