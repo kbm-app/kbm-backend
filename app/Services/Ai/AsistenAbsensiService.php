@@ -30,11 +30,13 @@ class AsistenAbsensiService
 
     private const SYSTEM_PROMPT = <<<'PROMPT'
 Kamu membantu super admin sebuah KBM (Kegiatan Belajar Mengajar) mencatat laporan absensi yang dikirim pengajar.
-Laporan yang diberikan bisa berupa:
-1. Pesan teks bebas (misalnya pesan WhatsApp harian, atau rangkuman beberapa hari berturut-turut).
+Input yang diberikan super admin bisa berupa:
+1. Pesan teks bebas (pesan WhatsApp harian, rangkuman beberapa hari, atau instruksi penyesuaian/pencatatan sesi).
 2. Foto lembar absensi:
    - Bisa berupa catatan harian.
    - ATAU berupa LEMBAR REKAP MATRIKS BULANAN (seperti formulir "DAFTAR HADIR" dengan kolom tanggal 1 sampai 31 dan baris nama-nama murid).
+3. Kombinasi foto lembar absensi DAN teks pesan/instruksi.
+4. Teks pesan/instruksi saja tanpa foto (mis. instruksi pencatatan atau koreksi sesi).
 
 Tugasmu: ekstrak SEMUA sesi pertemuan yang ada di dalam laporan (bisa 1 hari, beberapa hari, atau rekap sebulan penuh) menjadi data terstruktur sesuai skema JSON.
 
@@ -72,13 +74,15 @@ Aturan Penting:
    - Jam mulai & selesai dalam format HH:MM (bila tidak disebutkan di laporan, isi null).
    - program_id diisi jika laporan menyebutkan nama program yang cocok dengan referensi.
 
-7. Instruksi Khusus dari Super Admin (Prioritas Tertinggi):
-   - Jika laporan memuat bagian '*** INSTRUKSI KHUSUS DARI SUPER ADMIN ***', kamu WAJIB mematuhi dan memprioritaskan instruksi tersebut di atas data mentah:
+7. Instruksi Khusus dan Penyesuaian dari Super Admin (Prioritas Tertinggi):
+   - Teks input atau instruksi dari super admin dapat berupa penyesuaian untuk foto/laporan yang dilampirkan, ATAU berupa instruksi pencatatan sesi mandiri.
+   - Kamu WAJIB mematuhi dan memprioritaskan instruksi tersebut di atas data mentah:
      * Ubah Jam: Jika admin meminta ubah jam kegiatan pada tanggal atau rentang tanggal tertentu (contoh: "khusus tanggal 10 sampai 15 jam 16:30 - 18:00"), terapkan jam_mulai dan jam_selesai tersebut pada seluruh sesi di rentang tanggal itu.
      * Materi: Jika admin menentukan materi untuk tanggal tertentu (contoh: "materi tanggal 1-10 Bab 1, tanggal 12 ke atas Bab 2"), isi field 'materi' sesuai instruksi.
      * Pengajar Pengganti: Jika admin menginstruksikan pergantian pengajar (contoh: "tanggal 16 pengajar digantikan Ust. Fajar"), beri status 'digantikan' dan isi 'pengganti_id' pada tanggal tersebut.
      * Koreksi Presensi Murid: Jika admin meminta perubahan status murid tertentu (contoh: "Azril izin sakit tanggal 12 sampai 15"), ubah status murid tersebut menjadi 'sakit' dengan keterangan yang diminta.
      * Lewati Tanggal: Jika admin meminta mengabaikan tanggal tertentu (contoh: "abaikan tanggal 14"), JANGAN buat sesi untuk tanggal tersebut.
+     * Catat Sesi Mandiri: Jika hanya ada teks instruksi tanpa foto (contoh: "Catat sesi pertemuan Ahad kemarin jam 08:00, materi Tahsin, pengajar Ust. Ahmad, semua murid hadir"), susun draf sesi sesuai instruksi yang diberikan.
 PROMPT;
 
     public function __construct(

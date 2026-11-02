@@ -34,7 +34,7 @@ class OpenAiDriver implements AiDriverInterface
             $isiPrompt .= "\n\n*** INSTRUKSI KHUSUS DARI SUPER ADMIN (PRIORITAS TERTINGGI) ***\n" . trim((string) $instruksi);
         }
 
-        $isiPrompt .= "\n\nLaporan dari pengajar:\n" . $laporanText;
+        $isiPrompt .= "\n\nLaporan / Pesan / Instruksi dari super admin:\n" . $laporanText;
 
         $userContent = [
             [
