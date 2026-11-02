@@ -33,8 +33,8 @@ class AsistenAiController extends Controller
     /** Simpan draf yang sudah diperiksa admin menjadi sesi + absensi. */
     public function simpanAbsensi(SimpanAbsensiRequest $request): JsonResponse
     {
-        $pertemuan = $this->service->simpan($request->validated(), $request->user()->id);
+        $hasil = $this->service->simpan($request->validated(), $request->user()->id);
 
-        return response()->json(['pertemuan' => $pertemuan], 201);
+        return response()->json($hasil, 201);
     }
 }
