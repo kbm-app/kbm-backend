@@ -17,6 +17,7 @@ class OpenAiDriver implements AiDriverInterface
         array $schema,
         string $systemPrompt,
         ?string $modelOverride = null,
+        ?string $instruksi = null,
     ): array {
         $apiKey = config('services.openai.key');
         if (! $apiKey) {
@@ -27,8 +28,13 @@ class OpenAiDriver implements AiDriverInterface
         $baseUrl = config('services.openai.base_url', 'https://api.openai.com/v1');
 
         $laporanText = trim((string) $teks) !== '' ? $teks : '(tidak ada teks — baca dari foto)';
-        $isiPrompt = "Data referensi:\n" . json_encode($konteksData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
-            . "\n\nLaporan dari pengajar:\n" . $laporanText;
+        $isiPrompt = "Data referensi:\n" . json_encode($konteksData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+        if (! empty(trim((string) $instruksi))) {
+            $isiPrompt .= "\n\n*** INSTRUKSI KHUSUS DARI SUPER ADMIN (PRIORITAS TERTINGGI) ***\n" . trim((string) $instruksi);
+        }
+
+        $isiPrompt .= "\n\nLaporan dari pengajar:\n" . $laporanText;
 
         $userContent = [
             [

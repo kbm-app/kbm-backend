@@ -22,6 +22,7 @@ interface AiDriverInterface
         array $schema,
         string $systemPrompt,
         ?string $modelOverride = null,
+        ?string $instruksi = null,
     ): array;
 }
 

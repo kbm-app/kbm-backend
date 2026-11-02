@@ -25,6 +25,7 @@ class AsistenAiController extends Controller
             $request->file('gambar', []),
             $request->validated('provider'),
             $request->validated('model'),
+            $request->validated('instruksi'),
         );
 
         return response()->json($hasil);

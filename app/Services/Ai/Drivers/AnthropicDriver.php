@@ -21,6 +21,7 @@ class AnthropicDriver implements AiDriverInterface
         array $schema,
         string $systemPrompt,
         ?string $modelOverride = null,
+        ?string $instruksi = null,
     ): array {
         $apiKey = config('services.anthropic.key');
         if (! $apiKey) {
@@ -43,10 +44,17 @@ class AnthropicDriver implements AiDriverInterface
         }
 
         $laporanText = trim((string) $teks) !== '' ? $teks : '(tidak ada teks — baca dari foto)';
+        $isiPrompt = "Data referensi:\n" . json_encode($konteksData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+        if (! empty(trim((string) $instruksi))) {
+            $isiPrompt .= "\n\n*** INSTRUKSI KHUSUS DARI SUPER ADMIN (PRIORITAS TERTINGGI) ***\n" . trim((string) $instruksi);
+        }
+
+        $isiPrompt .= "\n\nLaporan dari pengajar:\n" . $laporanText;
+
         $content[] = [
             'type' => 'text',
-            'text' => "Data referensi:\n" . json_encode($konteksData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
-                . "\n\nLaporan dari pengajar:\n" . $laporanText,
+            'text' => $isiPrompt,
         ];
 
         try {

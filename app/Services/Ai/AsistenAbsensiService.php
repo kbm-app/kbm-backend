@@ -71,6 +71,14 @@ Aturan Penting:
 6. Jam & Program:
    - Jam mulai & selesai dalam format HH:MM (bila tidak disebutkan di laporan, isi null).
    - program_id diisi jika laporan menyebutkan nama program yang cocok dengan referensi.
+
+7. Instruksi Khusus dari Super Admin (Prioritas Tertinggi):
+   - Jika laporan memuat bagian '*** INSTRUKSI KHUSUS DARI SUPER ADMIN ***', kamu WAJIB mematuhi dan memprioritaskan instruksi tersebut di atas data mentah:
+     * Ubah Jam: Jika admin meminta ubah jam kegiatan pada tanggal atau rentang tanggal tertentu (contoh: "khusus tanggal 10 sampai 15 jam 16:30 - 18:00"), terapkan jam_mulai dan jam_selesai tersebut pada seluruh sesi di rentang tanggal itu.
+     * Materi: Jika admin menentukan materi untuk tanggal tertentu (contoh: "materi tanggal 1-10 Bab 1, tanggal 12 ke atas Bab 2"), isi field 'materi' sesuai instruksi.
+     * Pengajar Pengganti: Jika admin menginstruksikan pergantian pengajar (contoh: "tanggal 16 pengajar digantikan Ust. Fajar"), beri status 'digantikan' dan isi 'pengganti_id' pada tanggal tersebut.
+     * Koreksi Presensi Murid: Jika admin meminta perubahan status murid tertentu (contoh: "Azril izin sakit tanggal 12 sampai 15"), ubah status murid tersebut menjadi 'sakit' dengan keterangan yang diminta.
+     * Lewati Tanggal: Jika admin meminta mengabaikan tanggal tertentu (contoh: "abaikan tanggal 14"), JANGAN buat sesi untuk tanggal tersebut.
 PROMPT;
 
     public function __construct(
@@ -88,6 +96,7 @@ PROMPT;
         array $gambar,
         ?string $provider = null,
         ?string $model = null,
+        ?string $instruksi = null,
     ): array {
         $referensi = $this->referensi($kelas);
 
@@ -102,7 +111,7 @@ PROMPT;
         ];
 
         $driver = $this->aiManager->driver($provider);
-        $mentah = $driver->ekstrak($konteks, $teks, $gambar, $this->skema(), self::SYSTEM_PROMPT, $model);
+        $mentah = $driver->ekstrak($konteks, $teks, $gambar, $this->skema(), self::SYSTEM_PROMPT, $model, $instruksi);
 
         return [
             'hasil'     => $this->rapikan($mentah, $referensi, $kelas),

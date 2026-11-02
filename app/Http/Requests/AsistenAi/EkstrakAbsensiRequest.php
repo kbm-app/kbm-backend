@@ -29,8 +29,9 @@ class EkstrakAbsensiRequest extends FormRequest
             'teks'     => ['nullable', 'required_without:gambar', 'string', 'max:10000'],
             'gambar'   => ['nullable', 'array', 'max:4'],
             'gambar.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'provider' => ['nullable', 'string', 'in:openai,anthropic'],
-            'model'    => ['nullable', 'string', 'max:100'],
+            'provider'  => ['nullable', 'string', 'in:openai,anthropic'],
+            'model'     => ['nullable', 'string', 'max:100'],
+            'instruksi' => ['nullable', 'string', 'max:2000'],
         ];
     }
 }
