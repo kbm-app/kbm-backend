@@ -25,7 +25,8 @@ class KirimNotifikasiWaliMurid
             return;
         }
 
-        $tanggal     = $pertemuan->created_at->translatedFormat('d F Y');
+        // Tanggal sesi, bukan tanggal dicatat: sesi bisa dicatat/ditutup belakangan
+        $tanggal     = $pertemuan->tanggal->translatedFormat('d F Y');
         $namaKelas   = $pertemuan->kelas->nama ?? '-';
         $namaProgram = $pertemuan->program->nama ?? '-';
 

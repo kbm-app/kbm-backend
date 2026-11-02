@@ -65,7 +65,7 @@ class JadwalSeeder extends Seeder
                 continue;
             }
 
-            Jadwal::firstOrCreate(
+            $row = Jadwal::firstOrCreate(
                 [
                     'program_id'    => $program->id,
                     'kelas_id'      => $kelas->id,
@@ -75,12 +75,16 @@ class JadwalSeeder extends Seeder
                     'mulai_berlaku' => $item['mulai_berlaku'],
                 ],
                 [
-                    'pengajar_id'     => $this->pengajarUtamaId($kelas->id),
                     'jam_mulai'       => $item['jam_mulai'],
                     'jam_selesai'     => $item['jam_selesai'],
                     'selesai_berlaku' => $item['selesai_berlaku'],
                 ]
             );
+
+            // Pengajar jadwal disimpan di pivot jadwal_pengajar (multi pengajar)
+            if ($pengajarId = $this->pengajarUtamaId($kelas->id)) {
+                $row->pengajar()->syncWithoutDetaching([$pengajarId]);
+            }
         }
 
         // Jadwal bulanan lintas kelas (kelas_id null)
@@ -105,7 +109,6 @@ class JadwalSeeder extends Seeder
                     'mulai_berlaku' => $item['mulai_berlaku'],
                 ],
                 [
-                    'pengajar_id'     => null,
                     'jam_mulai'       => $item['jam_mulai'],
                     'jam_selesai'     => $item['jam_selesai'],
                     'selesai_berlaku' => $item['selesai_berlaku'],

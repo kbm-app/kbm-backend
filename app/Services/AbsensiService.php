@@ -138,7 +138,11 @@ class AbsensiService
         );
     }
 
-    public function tutupSesi(Pertemuan $pertemuan, string $jamSelesai): Pertemuan
+    /**
+     * @param  bool  $kirimNotifikasi  false bila pemanggil ingin memicu PertemuanSelesai sendiri
+     *                                 (mis. setelah transaksi commit) atau tidak sama sekali
+     */
+    public function tutupSesi(Pertemuan $pertemuan, string $jamSelesai, bool $kirimNotifikasi = true): Pertemuan
     {
         if ($pertemuan->status !== 'berlangsung') {
             throw ValidationException::withMessages([
@@ -167,7 +171,9 @@ class AbsensiService
             'jam_selesai' => $jamSelesai,
         ]);
 
-        event(new PertemuanSelesai($pertemuan));
+        if ($kirimNotifikasi) {
+            event(new PertemuanSelesai($pertemuan));
+        }
 
         return $pertemuan->fresh(['kelas', 'program', 'pengajar.user', 'absensiMurid.murid', 'absensiPengajar']);
     }

@@ -35,4 +35,20 @@ return [
         ],
     ],
 
+    // Asisten Input AI (super admin): membaca laporan teks/foto menjadi data absensi
+    'ai' => [
+        'provider' => env('AI_PROVIDER', 'openai'),
+    ],
+
+    'openai' => [
+        'key'      => env('OPENAI_API_KEY'),
+        'model'    => env('OPENAI_MODEL', 'gpt-5-mini'),
+        'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+    ],
+
+    'anthropic' => [
+        'key'   => env('ANTHROPIC_API_KEY'),
+        'model' => env('ANTHROPIC_MODEL', 'claude-opus-5-5'),
+    ],
+
 ];

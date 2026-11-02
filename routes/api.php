@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AsistenAiController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\MusyawarahController;
 use App\Http\Controllers\BabKurikulumController;
@@ -208,6 +209,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('murid',    [ImportController::class, 'murid']);
         Route::post('pengajar', [ImportController::class, 'pengajar']);
     });
+
+    // Asisten Input AI (Super Admin)
+    Route::post('asisten-ai/absensi/ekstrak', [AsistenAiController::class, 'ekstrakAbsensi'])->middleware('throttle:20,1');
+    Route::post('asisten-ai/absensi/simpan',  [AsistenAiController::class, 'simpanAbsensi']);
 
     // Settings WA (Super Admin)
     Route::get('settings/wa', [WaSettingsController::class, 'show']);
