@@ -20,6 +20,7 @@ class UpdatePertemuanRequest extends FormRequest
             // Jam sesi hanya dikoreksi super admin pada sesi yang sudah selesai (dicek di controller)
             'jam_mulai'   => ['sometimes', 'required', 'date_format:H:i'],
             'jam_selesai' => ['sometimes', 'required', 'date_format:H:i'],
+            'jadwal_id'   => ['sometimes', 'nullable', 'integer', 'exists:jadwal,id'],
         ];
     }
 
@@ -28,6 +29,7 @@ class UpdatePertemuanRequest extends FormRequest
         return [
             'jam_mulai.date_format'   => 'Format jam mulai: HH:MM.',
             'jam_selesai.date_format' => 'Format jam selesai: HH:MM.',
+            'jadwal_id.exists'        => 'Jadwal yang dipilih tidak valid.',
         ];
     }
 }

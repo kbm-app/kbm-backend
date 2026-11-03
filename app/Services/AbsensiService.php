@@ -112,6 +112,145 @@ class AbsensiService
         }
     }
 
+    /**
+     * Cari jadwal aktif yang cocok untuk pertemuan berdasarkan tanggal, kelas, program, dan jam.
+     * Mengembalikan Jadwal jika ada yang cocok, atau null jika tidak ada (sesi di luar jadwal).
+     */
+    public function cariJadwalCocok(Pertemuan $pertemuan, string $jamMulai, ?string $jamSelesai = null): ?Jadwal
+    {
+        $hariList = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];
+        $tanggal  = Carbon::parse($pertemuan->tanggal)->startOfDay();
+        $hari     = $hariList[$tanggal->dayOfWeekIso - 1];
+        $mingguKe = (int) ceil($tanggal->day / 7);
+
+        // Ambil jadwal aktif untuk kelas & program ini di hari & minggu terkait (kelas spesifik diutamakan)
+        $kandidat = Jadwal::query()
+            ->where('program_id', $pertemuan->program_id)
+            ->where(fn ($q) => $q->whereNull('kelas_id')->orWhere('kelas_id', $pertemuan->kelas_id))
+            ->where('hari', $hari)
+            ->where(function ($q) use ($mingguKe) {
+                $q->where('frekuensi', 'mingguan')
+                  ->orWhere(fn ($q2) => $q2->where('frekuensi', 'bulanan')->where('minggu_ke', $mingguKe));
+            })
+            ->where('mulai_berlaku', '<=', $tanggal->toDateString())
+            ->where(fn ($q) => $q->whereNull('selesai_berlaku')->orWhere('selesai_berlaku', '>=', $tanggal->toDateString()))
+            ->orderByDesc('kelas_id')
+            ->get();
+
+        // Singkirkan jadwal yang sudah dipakai sesi LAIN pada tanggal tersebut
+        $kandidat = $kandidat->filter(function (Jadwal $j) use ($pertemuan, $tanggal) {
+            return !Pertemuan::where('jadwal_id', $j->id)
+                ->where('tanggal', $tanggal->toDateString())
+                ->where('id', '!=', $pertemuan->id)
+                ->whereIn('status', ['berlangsung', 'selesai'])
+                ->exists();
+        });
+
+        if ($kandidat->isEmpty()) {
+            return null;
+        }
+
+        $jamMulaiClean   = substr($jamMulai, 0, 5);
+        $jamSelesaiClean = $jamSelesai ? substr($jamSelesai, 0, 5) : null;
+
+        // 1. Prioritas 1: Cocok persis jam mulai DAN jam selesai
+        if ($jamSelesaiClean) {
+            $cocokPersis = $kandidat->first(function (Jadwal $j) use ($jamMulaiClean, $jamSelesaiClean) {
+                return substr($j->jam_mulai, 0, 5) === $jamMulaiClean
+                    && substr((string) $j->jam_selesai, 0, 5) === $jamSelesaiClean;
+            });
+
+            if ($cocokPersis) {
+                return $cocokPersis;
+            }
+        }
+
+        // 2. Prioritas 2: Jika pertemuan saat ini sudah terhubung ke jadwal kandidat dan jam mulainya masih cocok
+        if ($pertemuan->jadwal_id) {
+            $jadwalSekarang = $kandidat->firstWhere('id', $pertemuan->jadwal_id);
+            if ($jadwalSekarang && substr($jadwalSekarang->jam_mulai, 0, 5) === $jamMulaiClean) {
+                return $jadwalSekarang;
+            }
+        }
+
+        // 3. Prioritas 3: Jadwal kandidat yang cocok jam mulainya
+        $cocokJamMulai = $kandidat->filter(function (Jadwal $j) use ($jamMulaiClean) {
+            return substr($j->jam_mulai, 0, 5) === $jamMulaiClean;
+        });
+
+        if ($cocokJamMulai->count() === 1) {
+            return $cocokJamMulai->first();
+        }
+
+        if ($cocokJamMulai->count() > 1) {
+            if ($jamSelesaiClean) {
+                return $cocokJamMulai->sortBy(function (Jadwal $j) use ($jamSelesaiClean) {
+                    return abs(strtotime(substr((string) $j->jam_selesai, 0, 5)) - strtotime($jamSelesaiClean));
+                })->first();
+            }
+            return $cocokJamMulai->first();
+        }
+
+        return null;
+    }
+
+    /**
+     * Tentukan dan sinkronkan jadwal_id saat sesi diperbarui:
+     * - Jika jadwal_id diberikan secara eksplisit, divalidasi kecocokannya.
+     * - Jika jam mulai/selesai diubah, dicari jadwal yang cocok secara otomatis (atau dilepas jika di luar jadwal).
+     */
+    public function sinkronJadwalPertemuan(Pertemuan $pertemuan, array &$data): void
+    {
+        $jamMulaiBaru   = $data['jam_mulai'] ?? substr($pertemuan->jam_mulai, 0, 5);
+        $jamSelesaiBaru = $data['jam_selesai'] ?? ($pertemuan->jam_selesai ? substr((string) $pertemuan->jam_selesai, 0, 5) : null);
+
+        // Kasus 1: jadwal_id dikirim eksplisit
+        if (array_key_exists('jadwal_id', $data)) {
+            if (!empty($data['jadwal_id'])) {
+                $jadwal = Jadwal::findOrFail($data['jadwal_id']);
+                $this->pastikanJadwalCocok($jadwal, [
+                    'tanggal'  => $pertemuan->tanggal->toDateString(),
+                    'kelas_id' => $pertemuan->kelas_id,
+                ]);
+
+                if ($jadwal->program_id !== $pertemuan->program_id) {
+                    throw ValidationException::withMessages([
+                        'jadwal_id' => 'Jadwal yang dipilih untuk program yang berbeda.',
+                    ]);
+                }
+
+                $sudahDipakai = Pertemuan::where('jadwal_id', $jadwal->id)
+                    ->where('tanggal', $pertemuan->tanggal->toDateString())
+                    ->where('id', '!=', $pertemuan->id)
+                    ->whereIn('status', ['berlangsung', 'selesai'])
+                    ->exists();
+
+                if ($sudahDipakai) {
+                    throw ValidationException::withMessages([
+                        'jadwal_id' => 'Jadwal ini sudah digunakan oleh sesi lain pada tanggal tersebut.',
+                    ]);
+                }
+
+                // Jika jam mulai diubah dan tidak sesuai dengan jadwal yang dipilih, re-evaluasi jadwal yang cocok
+                if (isset($data['jam_mulai']) && substr($jadwal->jam_mulai, 0, 5) !== substr($jamMulaiBaru, 0, 5)) {
+                    $jadwalCocok = $this->cariJadwalCocok($pertemuan, $jamMulaiBaru, $jamSelesaiBaru);
+                    $data['jadwal_id'] = $jadwalCocok?->id;
+                } else {
+                    $data['jadwal_id'] = $jadwal->id;
+                }
+            } else {
+                $data['jadwal_id'] = null;
+            }
+            return;
+        }
+
+        // Kasus 2: jadwal_id tidak dikirim, tetapi jam mulai atau jam selesai diubah
+        if (isset($data['jam_mulai']) || isset($data['jam_selesai'])) {
+            $jadwalCocok = $this->cariJadwalCocok($pertemuan, $jamMulaiBaru, $jamSelesaiBaru);
+            $data['jadwal_id'] = $jadwalCocok?->id;
+        }
+    }
+
     public function inputAbsensiBulk(Pertemuan $pertemuan, array $absensiData, int $pencatatId): void
     {
         if ($pertemuan->status !== 'berlangsung') {

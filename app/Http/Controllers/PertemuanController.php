@@ -93,8 +93,18 @@ class PertemuanController extends Controller
             }
         }
 
+        $this->service->sinkronJadwalPertemuan($pertemuan, $data);
+
         $pertemuan->update($data);
-        return response()->json(['pertemuan' => $pertemuan]);
+        return response()->json(['pertemuan' => $pertemuan->fresh([
+            'kelas',
+            'program',
+            'pengajar.user',
+            'jadwal',
+            'absensiMurid.murid',
+            'absensiPengajar.pengajar.user',
+            'absensiPengajar.pengganti.user',
+        ])]);
     }
 
     public function destroy(Pertemuan $pertemuan): JsonResponse
