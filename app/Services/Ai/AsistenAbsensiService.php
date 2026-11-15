@@ -46,9 +46,10 @@ Input yang diberikan super admin bisa berupa:
 Tugasmu: ekstrak SEMUA sesi pertemuan yang ada di dalam laporan (bisa 1 hari, beberapa hari, atau rekap sebulan penuh) menjadi data terstruktur sesuai skema JSON.
 
 Aturan Penting:
-1. Pengecekan Tanggal yang Sudah Tercatat (Skip):
-   - Di data referensi terdapat 'tanggal_sudah_tercatat' (daftar tanggal YYYY-MM-DD yang SUDAH TERSIMPAN di database untuk kelas ini).
-   - Bila laporan menyebut tanggal yang SUDAH ADA di daftar 'tanggal_sudah_tercatat', JANGAN BUAT objek sesi untuk tanggal tersebut (abaikan / skip). Tuliskan di 'catatan' bahwa sesi tanggal tersebut dilewati karena sudah ada di database.
+1. Pengecekan Sesi yang Sudah Tercatat (Skip):
+   - Di data referensi terdapat 'sesi_sudah_tercatat' (daftar sesi yang SUDAH TERSIMPAN di database untuk kelas ini: tanggal, jam_mulai, jadwal_id).
+   - Satu kelas bisa punya LEBIH DARI SATU sesi dalam sehari (misalnya sesi Maghrib dan sesi Isya dengan jam berbeda). Buat objek sesi TERPISAH untuk tiap sesi, masing-masing dengan jadwal_id, jam_mulai, dan jam_selesai-nya sendiri.
+   - Bila laporan menyebut sesi yang tanggalnya DAN jadwal/jam-nya sama dengan salah satu 'sesi_sudah_tercatat', JANGAN BUAT objek sesi itu (abaikan / skip) dan tuliskan di 'catatan' bahwa sesi dilewati karena sudah ada di database. Tanggal yang sama dengan jadwal/jam BERBEDA bukan duplikat dan tetap dibuat.
    - Kolom atau tanggal yang bertuliskan "LIBUR" (atau libur KBM) BUKAN sesi pertemuan, JANGAN dibuatkan sesi.
 
 2. Ekstraksi Lembar Matriks Bulanan:
@@ -122,7 +123,7 @@ PROMPT;
             'pengajar_kelas'         => $referensi['pengajar_kelas'],
             'pengajar_lain'          => $referensi['pengajar_lain'],
             'program'                => $referensi['program'],
-            'tanggal_sudah_tercatat' => $this->tanggalSudahTercatat($kelas->id),
+            'sesi_sudah_tercatat'    => $this->sesiSudahTercatat($kelas->id),
             'jadwal_kelas'           => $this->jadwalKelas($kelas),
             'libur_kelas'            => $this->liburKelas($kelas),
         ];
@@ -161,15 +162,16 @@ PROMPT;
             foreach ($daftarSesi as $i => $sesi) {
                 $tanggal = $sesi['tanggal'];
 
-                // Proteksi duplikasi: skip jika sesi pada tanggal ini sudah ada di database
-                $sudahAda = Pertemuan::where('kelas_id', $kelasId)->whereDate('tanggal', $tanggal)->exists();
-                if ($sudahAda) {
+                // Proteksi duplikasi: skip jika sesi yang sama (tanggal + jadwal/jam) sudah ada di database.
+                // Sesi lain di tanggal yang sama (mis. Maghrib dan Isya) bukan duplikat.
+                $rencanaSesi = $rencana[$i];
+                if (! empty($rencanaSesi['lewati'])
+                    || $this->cariSesiSudahAda($kelasId, $tanggal, $rencanaSesi['jadwal_id'], $rencanaSesi['jam_mulai'])) {
                     $tanggalDilewati[] = $tanggal;
                     continue;
                 }
 
                 $tutup = (bool) ($sesi['tutup_sesi'] ?? true);
-                $rencanaSesi = $rencana[$i];
 
                 $pertemuan = $this->absensi->bukaSesi([
                     'kelas_id'     => $kelasId,
@@ -239,7 +241,7 @@ PROMPT;
      * - Sesi yang tidak punya jadwal ("di luar jadwal") hanya diterima bila dikonfirmasi eksplisit
      *   lewat 'konfirmasi_di_luar_jadwal'.
      *
-     * @return array<int, array{jadwal_id: ?int, jam_mulai: string, jam_selesai: ?string}>
+     * @return array<int, array{lewati: true}|array{jadwal_id: ?int, jam_mulai: string, jam_selesai: ?string}>
      *
      * @throws ValidationException
      */
@@ -253,8 +255,11 @@ PROMPT;
             $tanggal = $sesi['tanggal'];
             $awalan  = $multi ? "sesi.{$i}." : '';
 
-            // Sesi yang tanggalnya sudah ada akan dilewati saat penyimpanan
-            if (Pertemuan::where('kelas_id', $kelasId)->whereDate('tanggal', $tanggal)->exists()) {
+            // Sesi yang sama (tanggal + jadwal/jam) yang sudah ada akan dilewati saat penyimpanan
+            $jadwalDikirim = ! empty($sesi['jadwal_id']) ? (int) $sesi['jadwal_id'] : null;
+            $jamDikirim    = ! empty($sesi['jam_mulai']) ? substr($sesi['jam_mulai'], 0, 5) : null;
+            if ($this->cariSesiSudahAda($kelasId, $tanggal, $jadwalDikirim, $jamDikirim)) {
+                $rencana[$i] = ['lewati' => true];
                 continue;
             }
 
@@ -310,19 +315,46 @@ PROMPT;
     }
 
     /**
-     * Daftar tanggal sesi yang sudah tersimpan di database untuk kelas ini.
-     * Digunakan agar AI maupun sistem otomatis melewati (skip) tanggal tersebut.
+     * Sesi yang sudah tersimpan di database untuk kelas ini (tanggal, jam mulai, jadwal).
+     * Digunakan agar AI maupun sistem melewati (skip) sesi yang sama. Satu kelas boleh punya
+     * lebih dari satu sesi per hari (mis. Maghrib dan Isya), jadi yang dibandingkan adalah
+     * tanggal beserta jadwal/jamnya, bukan tanggal saja.
      *
-     * @return string[]
+     * @return array<int, array{tanggal: string, jam_mulai: string, jadwal_id: ?int}>
      */
-    public function tanggalSudahTercatat(int $kelasId): array
+    public function sesiSudahTercatat(int $kelasId): array
     {
         return Pertemuan::where('kelas_id', $kelasId)
-            ->pluck('tanggal')
-            ->map(fn ($d) => $d instanceof Carbon ? $d->toDateString() : substr((string) $d, 0, 10))
-            ->unique()
-            ->values()
+            ->orderBy('tanggal')
+            ->orderBy('jam_mulai')
+            ->get(['tanggal', 'jam_mulai', 'jadwal_id'])
+            ->map(fn (Pertemuan $p) => [
+                'tanggal'   => $p->tanggal->toDateString(),
+                'jam_mulai' => substr((string) $p->jam_mulai, 0, 5),
+                'jadwal_id' => $p->jadwal_id,
+            ])
             ->all();
+    }
+
+    /**
+     * Cari sesi yang sudah ada dan sama dengan sesi yang akan dibuat: tanggal sama dan
+     * (jadwal sama, atau jam mulai sama). Bila jadwal maupun jam belum diketahui, sesi lain
+     * di tanggal itu tidak bisa dibedakan sehingga dianggap sama (perilaku lama, mencegah ganda).
+     */
+    private function cariSesiSudahAda(int $kelasId, string $tanggal, ?int $jadwalId, ?string $jamMulai): ?Pertemuan
+    {
+        $ada = Pertemuan::where('kelas_id', $kelasId)->whereDate('tanggal', $tanggal)->get(['id', 'jadwal_id', 'jam_mulai']);
+        if ($ada->isEmpty()) {
+            return null;
+        }
+
+        $jam = $jamMulai ? substr($jamMulai, 0, 5) : null;
+        if ($jadwalId === null && $jam === null) {
+            return $ada->first();
+        }
+
+        return $ada->first(fn (Pertemuan $p) => ($jadwalId !== null && (int) $p->jadwal_id === $jadwalId)
+            || ($jam !== null && substr((string) $p->jam_mulai, 0, 5) === $jam));
     }
 
     /**
@@ -512,9 +544,8 @@ PROMPT;
             ];
         }
 
-        $daftarTanggalSudahAda = $this->tanggalSudahTercatat($kelas->id);
         $sesiRapih = [];
-        $tanggalTerproses = [];
+        $kunciTerproses = [];
 
         foreach ((array) ($mentah['sesi'] ?? []) as $s) {
             $tanggal = $this->tanggalValid($s['tanggal'] ?? null);
@@ -522,20 +553,25 @@ PROMPT;
                 continue;
             }
 
-            // Hindari duplikasi tanggal di dalam respons AI itu sendiri
-            if (in_array($tanggal, $tanggalTerproses, true)) {
+            // Satu kelas boleh punya beberapa sesi per hari (mis. Maghrib dan Isya): sesi dianggap sama
+            // bila tanggal DAN jadwal/jam-nya sama.
+            $jadwalAiId = is_int($s['jadwal_id'] ?? null) ? $s['jadwal_id'] : null;
+            $jamAi      = $this->jamValid($s['jam_mulai'] ?? null);
+
+            // Hindari duplikasi sesi di dalam respons AI itu sendiri
+            $kunci = $tanggal . '|' . ($jadwalAiId ?? $jamAi ?? '');
+            if (in_array($kunci, $kunciTerproses, true)) {
                 continue;
             }
-            $tanggalTerproses[] = $tanggal;
+            $kunciTerproses[] = $kunci;
 
-            // Cek apakah tanggal ini sudah tercatat di database
-            $sudahAdaDiDb = in_array($tanggal, $daftarTanggalSudahAda, true);
-            $pertemuanAda = $sudahAdaDiDb
-                ? Pertemuan::where('kelas_id', $kelas->id)->whereDate('tanggal', $tanggal)->first(['id', 'tanggal'])
-                : null;
+            // Cek apakah sesi ini sudah tercatat di database
+            $pertemuanAda = $this->cariSesiSudahAda($kelas->id, $tanggal, $jadwalAiId, $jamAi);
+            $sudahAdaDiDb = $pertemuanAda !== null;
 
             if ($sudahAdaDiDb) {
-                $catatan[] = "Sesi tanggal {$tanggal} sudah ada di database (Pertemuan #{$pertemuanAda?->id}) — otomatis dilewati.";
+                $catatan[] = "Sesi tanggal {$tanggal}" . ($jamAi ? " pukul {$jamAi}" : '')
+                    . " sudah ada di database (Pertemuan #{$pertemuanAda->id}) — otomatis dilewati.";
             }
 
             // Pengajar sesi
@@ -631,8 +667,8 @@ PROMPT;
             ];
         }
 
-        // Urutkan sesi berdasarkan tanggal secara kronologis
-        usort($sesiRapih, fn ($a, $b) => strcmp($a['tanggal'], $b['tanggal']));
+        // Urutkan sesi secara kronologis (tanggal, lalu jam mulai bila ada beberapa sesi sehari)
+        usort($sesiRapih, fn ($a, $b) => strcmp($a['tanggal'] . ' ' . ($a['jam_mulai'] ?? ''), $b['tanggal'] . ' ' . ($b['jam_mulai'] ?? '')));
 
         $totalSesi     = count($sesiRapih);
         $sesiBaru      = count(array_filter($sesiRapih, fn ($s) => empty($s['sudah_ada'])));

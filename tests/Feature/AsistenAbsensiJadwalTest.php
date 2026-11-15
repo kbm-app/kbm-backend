@@ -253,6 +253,83 @@ class AsistenAbsensiJadwalTest extends TestCase
         $this->assertNotEmpty($sesi['2026-10-04']['peringatan']);
     }
 
+    // ---- dua sesi dalam sehari (mis. Maghrib dan Isya) ----------------------------------------
+
+    /** Jadwal kedua di hari yang sama, mis. sesi Maghrib 19:00-19:30 di samping sesi sore. */
+    private function jadwalKedua(): int
+    {
+        $id = DB::table('jadwal')->insertGetId([
+            'program_id' => $this->programId, 'kelas_id' => $this->kelasId, 'frekuensi' => 'mingguan',
+            'hari' => 'senin', 'jam_mulai' => '19:00', 'jam_selesai' => '19:30',
+            'mulai_berlaku' => '2026-09-26', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('jadwal_pengajar')->insert([
+            'jadwal_id' => $id, 'pengajar_id' => $this->pengajarId, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return $id;
+    }
+
+    public function test_dua_sesi_di_hari_yang_sama_dengan_jadwal_berbeda_tersimpan_keduanya(): void
+    {
+        $kedua = $this->jadwalKedua();
+
+        $hasil = $this->simpan([
+            $this->sesi('2026-10-05', ['jadwal_id' => $this->jadwal['senin']]),
+            $this->sesi('2026-10-05', ['jadwal_id' => $kedua]),
+        ]);
+
+        $this->assertSame(2, $hasil['jumlah']);
+        $this->assertSame([], $hasil['dilewati']);
+
+        $sesi = Pertemuan::whereDate('tanggal', '2026-10-05')->orderBy('jam_mulai')->get();
+        $this->assertSame([$this->jadwal['senin'], $kedua], $sesi->pluck('jadwal_id')->all());
+        $this->assertSame(['16:10', '19:00'], $sesi->map(fn ($p) => substr($p->jam_mulai, 0, 5))->all());
+    }
+
+    public function test_sesi_yang_sama_dilewati_tetapi_sesi_lain_di_hari_itu_tetap_dibuat(): void
+    {
+        $kedua = $this->jadwalKedua();
+        $this->simpan([$this->sesi('2026-10-05', ['jadwal_id' => $this->jadwal['senin']])]);
+
+        $hasil = $this->simpan([
+            $this->sesi('2026-10-05', ['jadwal_id' => $this->jadwal['senin']]), // sudah ada -> dilewati
+            $this->sesi('2026-10-05', ['jadwal_id' => $kedua]),                  // sesi lain di hari yang sama -> dibuat
+        ]);
+
+        $this->assertSame(['2026-10-05'], $hasil['dilewati']);
+        $this->assertSame(1, $hasil['jumlah']);
+        $this->assertSame(2, Pertemuan::count());
+    }
+
+    public function test_ekstrak_membedakan_sesi_yang_sudah_ada_dari_sesi_lain_di_tanggal_yang_sama(): void
+    {
+        $kedua = $this->jadwalKedua();
+        $this->simpan([$this->sesi('2026-10-05', ['jadwal_id' => $this->jadwal['senin']])]);
+
+        $konteks = $this->fakeAi([
+            'pengajar_umum' => [], 'nama_tidak_dikenali' => [], 'catatan' => [],
+            'sesi' => [
+                $this->sesiAi('2026-10-05', $this->jadwal['senin']), // sudah tersimpan
+                $this->sesiAi('2026-10-05', $kedua),                 // belum
+            ],
+        ]);
+
+        $hasil = app(AsistenAbsensiService::class)->ekstrak(Kelas::findOrFail($this->kelasId), 'laporan', [])['hasil'];
+
+        $this->assertSame([['tanggal' => '2026-10-05', 'jam_mulai' => '16:10', 'jadwal_id' => $this->jadwal['senin']]], $konteks['sesi_sudah_tercatat']);
+        $this->assertCount(2, $hasil['sesi']);
+        $this->assertSame(1, $hasil['sesi_sudah_ada']);
+        $this->assertSame(1, $hasil['sesi_baru']);
+
+        [$lama, $baru] = $hasil['sesi'];
+        $this->assertTrue($lama['sudah_ada']);
+        $this->assertFalse($baru['sudah_ada']);
+        $this->assertSame($kedua, $baru['jadwal_id']);
+        $this->assertSame('19:00', $baru['jam_mulai']);
+        $this->assertFalse($baru['di_luar_jadwal']);
+    }
+
     public function test_ekstrak_menandai_tanggal_libur(): void
     {
         DB::table('libur')->insert([
