@@ -18,6 +18,7 @@ use App\Models\Musyawarah;
 use App\Models\Pengajar;
 use App\Models\Pertemuan;
 use App\Services\AbsensiService;
+use App\Services\MusyawarahService;
 use App\Models\Program;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -306,6 +307,9 @@ class ExportController extends Controller
 
         $notulensiByKategori = $musyawarah->notulensi->groupBy('kategori');
 
+        // Poin notulensi bulan lalu beserta tindak lanjut yang dicatat di musyawarah ini
+        $tindakLanjutLalu = collect(app(MusyawarahService::class)->getEvaluasi($musyawarah)['notulensi_open']);
+
         $bulanLabel = Carbon::createFromDate($musyawarah->tahun, $musyawarah->bulan, 1)
             ->locale('id')->translatedFormat('F');
 
@@ -314,7 +318,8 @@ class ExportController extends Controller
             'laporan'            => $musyawarah->laporan,
             'notulensi'          => $musyawarah->notulensi,
             'notulensiByKategori' => $notulensiByKategori,
-            'bulanLabel'         => $bulanLabel,
+            'tindakLanjutLalu'   => $tindakLanjutLalu,
+            'bulanLabel'        => $bulanLabel,
             'cetakOleh'          => $request->user()->name,
         ])->setPaper('a4', 'portrait');
 

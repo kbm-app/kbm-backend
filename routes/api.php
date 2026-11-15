@@ -185,6 +185,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('musyawarah/{musyawarah}/notulensi', [MusyawarahController::class, 'notulensiStore']);
     Route::put('musyawarah/{musyawarah}/notulensi/{notulensi}', [MusyawarahController::class, 'notulensiUpdate']);
     Route::delete('musyawarah/{musyawarah}/notulensi/{notulensi}', [MusyawarahController::class, 'notulensiDestroy']);
+    Route::put('musyawarah/{musyawarah}/notulensi/{notulensi}/tindak-lanjut', [MusyawarahController::class, 'notulensiTindakLanjut']);
 
     // Export
     Route::prefix('export')->group(function () {

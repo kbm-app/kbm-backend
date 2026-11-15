@@ -220,7 +220,13 @@ class MusyawarahService
             ];
         })->values()->all();
 
-        $notulensiOpen = $sebelumnya->notulensi()->open()->get()->toArray();
+        // Poin bulan lalu yang masih open, plus yang sudah ditindaklanjuti di musyawarah ini
+        // (supaya isian & status barunya tetap tampil setelah ditandai selesai/ditunda).
+        $notulensiOpen = $sebelumnya->notulensi()
+            ->where(fn ($q) => $q->open()->orWhere('tindak_lanjut_musyawarah_id', $musyawarah->id))
+            ->orderBy('created_at')
+            ->get()
+            ->toArray();
 
         return [
             'per_kelas'      => $perKelas,

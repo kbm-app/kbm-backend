@@ -6,6 +6,7 @@ use App\Http\Requests\Musyawarah\StoreMusyawarahRequest;
 use App\Http\Requests\Musyawarah\UpdateMusyawarahRequest;
 use App\Http\Requests\Musyawarah\UpdateLaporanRequest;
 use App\Http\Requests\Musyawarah\StoreNotulensiRequest;
+use App\Http\Requests\Musyawarah\UpdateTindakLanjutNotulensiRequest;
 use App\Models\LaporanMusyawarah;
 use App\Models\Musyawarah;
 use App\Models\NotulensiMusyawarah;
@@ -188,6 +189,34 @@ class MusyawarahController extends Controller
         abort_if($notulensi->musyawarah_id !== $musyawarah->id, 404);
 
         $notulensi->update($request->validated());
+        return response()->json(['notulensi' => $notulensi]);
+    }
+
+    /**
+     * Isi tindak lanjut atas poin notulensi bulan lalu, dicatat di musyawarah ini.
+     * Poin yang boleh ditindaklanjuti hanya milik musyawarah bulan sebelumnya.
+     */
+    public function notulensiTindakLanjut(UpdateTindakLanjutNotulensiRequest $request, Musyawarah $musyawarah, NotulensiMusyawarah $notulensi): JsonResponse
+    {
+        if ($musyawarah->status === 'selesai') {
+            throw ValidationException::withMessages([
+                'status' => 'Musyawarah ini sudah ditutup, tindak lanjut tidak dapat diubah.',
+            ]);
+        }
+
+        abort_if($notulensi->musyawarah_id !== $musyawarah->musyawarahSebelumnya()?->id, 404);
+
+        $tindakLanjut = trim((string) $request->validated('tindak_lanjut')) ?: null;
+        $status       = $request->validated('status_tindak_lanjut');
+
+        $notulensi->update([
+            'tindak_lanjut'               => $tindakLanjut,
+            'status_tindak_lanjut'        => $status,
+            // Tetap tertaut ke musyawarah ini selama ada isian atau statusnya sudah diubah,
+            // supaya poin yang baru ditandai selesai tidak langsung hilang dari section-nya.
+            'tindak_lanjut_musyawarah_id' => ($tindakLanjut !== null || $status !== 'open') ? $musyawarah->id : null,
+        ]);
+
         return response()->json(['notulensi' => $notulensi]);
     }
 

@@ -16,6 +16,8 @@ class NotulensiMusyawarah extends Model
         'isi',
         'penanggung_jawab',
         'status_tindak_lanjut',
+        'tindak_lanjut',
+        'tindak_lanjut_musyawarah_id',
     ];
 
     public function scopeOpen(Builder $query): Builder

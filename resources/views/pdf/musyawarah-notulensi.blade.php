@@ -243,6 +243,38 @@
 </div>
 @endif
 
+{{-- Tindak lanjut poin notulensi bulan lalu --}}
+@if($tindakLanjutLalu->count() > 0)
+<div class="section">
+  <div class="keep-together">
+  <div class="section-title">Tindak Lanjut Notulensi Bulan Lalu</div>
+  <table class="tabel">
+    <thead>
+      <tr>
+        <th style="width: 22px;">No</th>
+        <th>Poin Bulan Lalu</th>
+        <th>Tindak Lanjut</th>
+        <th class="center" style="width: 62px;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      @foreach($tindakLanjutLalu as $item)
+      @php [$tlLabel, $tlBg, $tlFg] = $statusTl[$item['status_tindak_lanjut']] ?? [ucfirst($item['status_tindak_lanjut']), '#f1f5f9', '#475569']; @endphp
+      <tr>
+        <td class="muted">{{ $loop->iteration }}</td>
+        <td class="pre">{{ $item['isi'] }}@if($item['penanggung_jawab']) (PJ: {{ $item['penanggung_jawab'] }})@endif</td>
+        <td class="pre">{{ $item['tindak_lanjut'] ?: '–' }}</td>
+        <td class="center">
+          <span class="badge" style="background: {{ $tlBg }}; color: {{ $tlFg }};">{{ $tlLabel }}</span>
+        </td>
+      </tr>
+      @endforeach
+    </tbody>
+  </table>
+  </div>
+</div>
+@endif
+
 {{-- Notulensi --}}
 @if($notulensi->count() > 0)
 <div class="section">
