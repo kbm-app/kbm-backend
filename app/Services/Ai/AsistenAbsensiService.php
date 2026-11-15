@@ -4,7 +4,9 @@ namespace App\Services\Ai;
 
 use App\Events\PertemuanSelesai;
 use App\Models\AbsensiPengajar;
+use App\Models\Jadwal;
 use App\Models\Kelas;
+use App\Models\Libur;
 use App\Models\Murid;
 use App\Models\Pengajar;
 use App\Models\Pertemuan;
@@ -27,6 +29,9 @@ class AsistenAbsensiService
 {
     private const STATUS_MURID    = ['hadir', 'izin', 'sakit', 'alpha', 'terlambat'];
     private const STATUS_PENGAJAR = ['hadir', 'berhalangan', 'digantikan'];
+
+    /** Seberapa jauh ke belakang jadwal/libur disertakan sebagai konteks AI. */
+    private const RENTANG_HARI_KONTEKS = 120;
 
     private const SYSTEM_PROMPT = <<<'PROMPT'
 Kamu membantu super admin sebuah KBM (Kegiatan Belajar Mengajar) mencatat laporan absensi yang dikirim pengajar.
@@ -83,6 +88,12 @@ Aturan Penting:
      * Koreksi Presensi Murid: Jika admin meminta perubahan status murid tertentu (contoh: "Azril izin sakit tanggal 12 sampai 15"), ubah status murid tersebut menjadi 'sakit' dengan keterangan yang diminta.
      * Lewati Tanggal: Jika admin meminta mengabaikan tanggal tertentu (contoh: "abaikan tanggal 14"), JANGAN buat sesi untuk tanggal tersebut.
      * Catat Sesi Mandiri: Jika hanya ada teks instruksi tanpa foto (contoh: "Catat sesi pertemuan Ahad kemarin jam 08:00, materi Tahsin, pengajar Ust. Ahmad, semua murid hadir"), susun draf sesi sesuai instruksi yang diberikan.
+
+8. Jadwal Kelas ('jadwal_kelas') dan Libur ('libur_kelas'):
+   - 'jadwal_kelas' berisi jadwal rutin kelas (hari, jam, masa berlaku). Sesi rutin HANYA terjadi pada hari dan tanggal yang sesuai jadwal tersebut.
+   - Isi 'jadwal_id' pada tiap sesi dengan id jadwal yang cocok (hari sama dan tanggal masih dalam masa berlaku). Jika tidak ada yang cocok, isi null.
+   - Jika jam tidak disebut di laporan atau instruksi, isi jam_mulai dan jam_selesai dengan null — sistem akan mengisinya dari jadwal. JANGAN mengarang jam (misalnya 08:00-09:30).
+   - JANGAN membuat sesi pada tanggal yang jatuh di hari tanpa jadwal (mis. Sabtu/Minggu bila jadwal hanya Senin-Jumat) atau pada tanggal libur ('libur_kelas'), KECUALI super admin secara eksplisit meminta sesi khusus/pengganti pada tanggal tersebut. Bila ragu, jangan buat sesinya dan jelaskan di 'catatan'.
 PROMPT;
 
     public function __construct(
@@ -112,6 +123,8 @@ PROMPT;
             'pengajar_lain'          => $referensi['pengajar_lain'],
             'program'                => $referensi['program'],
             'tanggal_sudah_tercatat' => $this->tanggalSudahTercatat($kelas->id),
+            'jadwal_kelas'           => $this->jadwalKelas($kelas),
+            'libur_kelas'            => $this->liburKelas($kelas),
         ];
 
         $driver = $this->aiManager->driver($provider);
@@ -139,9 +152,13 @@ PROMPT;
 
         $pertemuanDibuat = [];
         $tanggalDilewati = [];
+        $idKirimNotifikasi = [];
 
-        DB::transaction(function () use ($daftarSesi, $kelasId, $pencatatId, &$pertemuanDibuat, &$tanggalDilewati) {
-            foreach ($daftarSesi as $sesi) {
+        // Tentukan jadwal & jam tiap sesi dan validasi SEMUANYA sebelum ada yang disimpan
+        $rencana = $this->susunRencana($daftarSesi, $kelasId, multi: isset($data['sesi']) && is_array($data['sesi']));
+
+        DB::transaction(function () use ($daftarSesi, $rencana, $kelasId, $pencatatId, &$pertemuanDibuat, &$tanggalDilewati, &$idKirimNotifikasi) {
+            foreach ($daftarSesi as $i => $sesi) {
                 $tanggal = $sesi['tanggal'];
 
                 // Proteksi duplikasi: skip jika sesi pada tanggal ini sudah ada di database
@@ -152,13 +169,14 @@ PROMPT;
                 }
 
                 $tutup = (bool) ($sesi['tutup_sesi'] ?? true);
+                $rencanaSesi = $rencana[$i];
 
                 $pertemuan = $this->absensi->bukaSesi([
                     'kelas_id'     => $kelasId,
                     'program_id'   => $sesi['program_id'],
-                    'jadwal_id'    => $sesi['jadwal_id'] ?? null,
+                    'jadwal_id'    => $rencanaSesi['jadwal_id'],
                     'tanggal'      => $tanggal,
-                    'jam_mulai'    => $sesi['jam_mulai'] ?? '08:00',
+                    'jam_mulai'    => $rencanaSesi['jam_mulai'],
                     'materi'       => $sesi['materi'] ?? null,
                     'pengajar_ids' => array_column($sesi['pengajar'], 'pengajar_id'),
                 ], $pencatatId);
@@ -186,8 +204,11 @@ PROMPT;
                 }
 
                 if ($tutup) {
-                    $jamSelesai = ! empty($sesi['jam_selesai']) ? $sesi['jam_selesai'] : '09:30';
-                    $pertemuan = $this->absensi->tutupSesi($pertemuan, $jamSelesai, kirimNotifikasi: false);
+                    $pertemuan = $this->absensi->tutupSesi($pertemuan, $rencanaSesi['jam_selesai'], kirimNotifikasi: false);
+
+                    if (! empty($sesi['kirim_notifikasi'])) {
+                        $idKirimNotifikasi[] = $pertemuan->id;
+                    }
                 }
 
                 $pertemuanDibuat[] = $pertemuan->fresh(['kelas', 'program', 'pengajar.user', 'absensiMurid.murid', 'absensiPengajar']);
@@ -195,9 +216,8 @@ PROMPT;
         });
 
         // Trigger notifikasi jika diminta (hanya untuk pertemuan yang ditutup)
-        foreach ($pertemuanDibuat as $index => $pertemuan) {
-            $sesiData = $daftarSesi[$index] ?? [];
-            if (! empty($sesiData['tutup_sesi']) && ! empty($sesiData['kirim_notifikasi'])) {
+        foreach ($pertemuanDibuat as $pertemuan) {
+            if (in_array($pertemuan->id, $idKirimNotifikasi, true)) {
                 event(new PertemuanSelesai($pertemuan));
             }
         }
@@ -207,6 +227,86 @@ PROMPT;
             'jumlah'    => count($pertemuanDibuat),
             'dilewati'  => $tanggalDilewati,
         ];
+    }
+
+    /**
+     * Tentukan jadwal_id, jam mulai, dan jam selesai tiap sesi yang akan dibuat, lalu validasi semuanya
+     * sebelum ada yang disimpan (agar batch tidak tersimpan setengah-setengah).
+     *
+     * - Mode multi-sesi: bila jadwal_id kosong, dicari otomatis dari tanggal/kelas/program.
+     *   Tanggal libur tidak dikaitkan ke jadwal (sesi di hari libur boleh, tanpa jadwal).
+     * - Jam kosong diisi dari jadwal. TIDAK ada jam bawaan: tanpa jam dan tanpa jadwal sesi ditolak.
+     * - Sesi yang tidak punya jadwal ("di luar jadwal") hanya diterima bila dikonfirmasi eksplisit
+     *   lewat 'konfirmasi_di_luar_jadwal'.
+     *
+     * @return array<int, array{jadwal_id: ?int, jam_mulai: string, jam_selesai: ?string}>
+     *
+     * @throws ValidationException
+     */
+    private function susunRencana(array $daftarSesi, int $kelasId, bool $multi): array
+    {
+        $rencana   = [];
+        $galat     = [];
+        $diLuar    = [];
+
+        foreach ($daftarSesi as $i => $sesi) {
+            $tanggal = $sesi['tanggal'];
+            $awalan  = $multi ? "sesi.{$i}." : '';
+
+            // Sesi yang tanggalnya sudah ada akan dilewati saat penyimpanan
+            if (Pertemuan::where('kelas_id', $kelasId)->whereDate('tanggal', $tanggal)->exists()) {
+                continue;
+            }
+
+            $jadwal = null;
+            if (! empty($sesi['jadwal_id'])) {
+                $jadwal = Jadwal::find($sesi['jadwal_id']); // kecocokannya divalidasi AbsensiService::bukaSesi
+            } elseif ($multi) {
+                $jadwal = $this->absensi->cariJadwalUntukTanggal($kelasId, $sesi['program_id'] ?? null, $tanggal, $sesi['jam_mulai'] ?? null);
+                if ($jadwal && Libur::untukSesi($kelasId, $jadwal->id, $tanggal)->exists()) {
+                    $jadwal = null;
+                }
+            }
+
+            $jamMulai = ! empty($sesi['jam_mulai']) ? substr($sesi['jam_mulai'], 0, 5) : ($jadwal ? substr((string) $jadwal->jam_mulai, 0, 5) : null);
+            if (! $jamMulai) {
+                $galat["{$awalan}jam_mulai"] = "Jam mulai sesi {$tanggal} wajib diisi (tidak ada jadwal yang bisa dijadikan acuan).";
+                continue;
+            }
+
+            $jamSelesai = null;
+            if (($sesi['tutup_sesi'] ?? true)) {
+                $jamSelesai = ! empty($sesi['jam_selesai'])
+                    ? substr($sesi['jam_selesai'], 0, 5)
+                    : ($jadwal && substr((string) $jadwal->jam_selesai, 0, 5) > $jamMulai ? substr((string) $jadwal->jam_selesai, 0, 5) : null);
+
+                if (! $jamSelesai) {
+                    $galat["{$awalan}jam_selesai"] = "Jam selesai sesi {$tanggal} wajib diisi bila sesi langsung ditutup.";
+                    continue;
+                }
+            }
+
+            if ($multi && ! $jadwal && empty($sesi['konfirmasi_di_luar_jadwal'])) {
+                $diLuar[] = $tanggal;
+            }
+
+            $rencana[$i] = [
+                'jadwal_id'   => $jadwal?->id,
+                'jam_mulai'   => $jamMulai,
+                'jam_selesai' => $jamSelesai,
+            ];
+        }
+
+        if ($diLuar) {
+            $galat['sesi'] = 'Sesi pada tanggal berikut tidak sesuai jadwal kelas (hari tanpa jadwal atau hari libur): '
+                . implode(', ', $diLuar) . '. Konfirmasi sebagai sesi di luar jadwal bila memang sesi khusus/pengganti.';
+        }
+
+        if ($galat) {
+            throw ValidationException::withMessages($galat);
+        }
+
+        return $rencana;
     }
 
     /**
@@ -223,6 +323,47 @@ PROMPT;
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * Jadwal rutin kelas (yang masih berlaku atau baru berakhir) sebagai konteks AI.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function jadwalKelas(Kelas $kelas): array
+    {
+        return Jadwal::query()
+            ->where(fn ($q) => $q->whereNull('kelas_id')->orWhere('kelas_id', $kelas->id))
+            ->where(fn ($q) => $q->whereNull('selesai_berlaku')->orWhere('selesai_berlaku', '>=', now()->subDays(self::RENTANG_HARI_KONTEKS)->toDateString()))
+            ->orderBy('mulai_berlaku')
+            ->get()
+            ->map(fn (Jadwal $j) => [
+                'id'              => $j->id,
+                'hari'            => $j->hari,
+                'jam_mulai'       => substr((string) $j->jam_mulai, 0, 5),
+                'jam_selesai'     => substr((string) $j->jam_selesai, 0, 5),
+                'program_id'      => $j->program_id,
+                'frekuensi'       => $j->frekuensi,
+                'minggu_ke'       => $j->minggu_ke,
+                'mulai_berlaku'   => $j->mulai_berlaku?->toDateString(),
+                'selesai_berlaku' => $j->selesai_berlaku?->toDateString(),
+            ])->values()->all();
+    }
+
+    /** Libur kelas (atau libur semua kelas) di rentang yang relevan sebagai konteks AI. */
+    private function liburKelas(Kelas $kelas): array
+    {
+        return Libur::query()
+            ->where(fn ($q) => $q->whereNull('kelas_id')->orWhere('kelas_id', $kelas->id))
+            ->where('tanggal_selesai', '>=', now()->subDays(self::RENTANG_HARI_KONTEKS)->toDateString())
+            ->orderBy('tanggal_mulai')
+            ->get(['tanggal_mulai', 'tanggal_selesai', 'keterangan', 'jadwal_id'])
+            ->map(fn (Libur $l) => [
+                'tanggal_mulai'   => $l->tanggal_mulai->toDateString(),
+                'tanggal_selesai' => $l->tanggal_selesai->toDateString(),
+                'keterangan'      => $l->keterangan,
+                'jadwal_id'       => $l->jadwal_id,
+            ])->values()->all();
     }
 
     /** Data kelas yang dipakai AI untuk mencocokkan nama, juga dipakai layar konfirmasi. */
@@ -283,6 +424,7 @@ PROMPT;
                 'jam_mulai'          => $nullable(['type' => 'string', 'description' => 'HH:MM']),
                 'jam_selesai'        => $nullable(['type' => 'string', 'description' => 'HH:MM']),
                 'program_id'         => $nullable(['type' => 'integer']),
+                'jadwal_id'          => $nullable(['type' => 'integer', 'description' => 'id dari jadwal_kelas yang cocok, atau null']),
                 'materi'             => $nullable(['type' => 'string']),
                 'status_murid_lain'  => ['type' => 'string', 'enum' => ['hadir', 'alpha', 'tidak_diketahui']],
                 'pengajar'           => [
@@ -295,7 +437,7 @@ PROMPT;
                 ],
             ],
             'required' => [
-                'tanggal', 'jam_mulai', 'jam_selesai', 'program_id', 'materi',
+                'tanggal', 'jam_mulai', 'jam_selesai', 'program_id', 'jadwal_id', 'materi',
                 'status_murid_lain', 'pengajar', 'absensi',
             ],
             'additionalProperties' => false,
@@ -436,12 +578,49 @@ PROMPT;
             }
 
             $programId = $s['program_id'] ?? null;
+            $programId = in_array($programId, $idProgram, true) ? $programId : null;
+            $jamMulai  = $this->jamValid($s['jam_mulai'] ?? null);
+            $jamSelesai = $this->jamValid($s['jam_selesai'] ?? null);
+
+            // Jadwal: pakai jadwal_id dari AI bila benar-benar cocok dengan tanggalnya; kalau tidak, cari sendiri.
+            // Jam yang kosong diisi dari jadwal (bukan ditebak/diberi nilai bawaan).
+            $jadwal = null;
+            $libur  = null;
+            $peringatan = [];
+            if (! $sudahAdaDiDb) {
+                $jadwal = $this->jadwalDariAi($s['jadwal_id'] ?? null, $kelas->id, $tanggal)
+                    ?? $this->absensi->cariJadwalUntukTanggal($kelas->id, $programId, $tanggal, $jamMulai);
+
+                $libur = Libur::untukSesi($kelas->id, $jadwal?->id, $tanggal)->first();
+                if ($libur) {
+                    $peringatan[] = "Tanggal {$tanggal} libur ({$libur->keterangan}).";
+                    $jadwal = null; // sesi pada hari libur tidak dikaitkan ke jadwal (lihat AbsensiService::bukaSesi)
+                }
+
+                if ($jadwal) {
+                    $programId ??= $jadwal->program_id;
+                    if ($jamMulai === null) {
+                        $jamMulai = substr((string) $jadwal->jam_mulai, 0, 5);
+                    }
+                    $jadwalSelesai = substr((string) $jadwal->jam_selesai, 0, 5);
+                    if ($jamSelesai === null && $jadwalSelesai > $jamMulai) {
+                        $jamSelesai = $jadwalSelesai;
+                    }
+                } elseif (! $libur) {
+                    $hariIni = Carbon::parse($tanggal)->locale('id')->translatedFormat('l');
+                    $peringatan[] = "Tidak ada jadwal kelas ini pada hari {$hariIni}, {$tanggal} — sesi akan tercatat di luar jadwal.";
+                }
+            }
 
             $sesiRapih[] = [
                 'tanggal'            => $tanggal,
-                'jam_mulai'          => $this->jamValid($s['jam_mulai'] ?? null),
-                'jam_selesai'        => $this->jamValid($s['jam_selesai'] ?? null),
-                'program_id'         => in_array($programId, $idProgram, true) ? $programId : null,
+                'jam_mulai'          => $jamMulai,
+                'jam_selesai'        => $jamSelesai,
+                'program_id'         => $programId,
+                'jadwal_id'          => $jadwal?->id,
+                'di_luar_jadwal'     => ! $sudahAdaDiDb && $jadwal === null,
+                'libur'              => $libur?->keterangan,
+                'peringatan'         => $peringatan,
                 'materi'             => is_string($s['materi'] ?? null) ? $s['materi'] : null,
                 'status_murid_lain'  => in_array($s['status_murid_lain'] ?? null, ['hadir', 'alpha'], true)
                     ? $s['status_murid_lain'] : 'tidak_diketahui',
@@ -477,6 +656,7 @@ PROMPT;
             $hasil['jam_mulai']         = $s1['jam_mulai'];
             $hasil['jam_selesai']       = $s1['jam_selesai'];
             $hasil['program_id']        = $s1['program_id'];
+            $hasil['jadwal_id']         = $s1['jadwal_id'];
             $hasil['materi']            = $s1['materi'];
             $hasil['status_murid_lain'] = $s1['status_murid_lain'];
             $hasil['pengajar']          = $s1['pengajar'];
@@ -484,6 +664,16 @@ PROMPT;
         }
 
         return $hasil;
+    }
+
+    /** jadwal_id dari AI hanya dipercaya bila jadwal itu memang berlaku untuk kelas & tanggal tersebut. */
+    private function jadwalDariAi(mixed $jadwalId, int $kelasId, string $tanggal): ?Jadwal
+    {
+        if (! is_int($jadwalId)) {
+            return null;
+        }
+
+        return $this->absensi->kandidatJadwal($kelasId, null, $tanggal)->firstWhere('id', $jadwalId);
     }
 
     private function tanggalValid(mixed $nilai): ?string

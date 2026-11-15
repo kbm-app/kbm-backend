@@ -51,6 +51,7 @@ class SimpanAbsensiRequest extends FormRequest
             $rules['sesi.*.absensi.*.murid_id']        = ['required', 'integer', 'exists:murid,id'];
             $rules['sesi.*.absensi.*.status']          = ['required', 'in:hadir,izin,sakit,alpha,terlambat'];
             $rules['sesi.*.absensi.*.keterangan']      = ['nullable', 'string', 'max:500'];
+            $rules['sesi.*.konfirmasi_di_luar_jadwal'] = ['boolean'];
             $rules['sesi.*.tutup_sesi']                = ['boolean'];
             $rules['sesi.*.kirim_notifikasi']          = ['boolean'];
         } else {

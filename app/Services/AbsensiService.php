@@ -113,38 +113,75 @@ class AbsensiService
     }
 
     /**
-     * Cari jadwal aktif yang cocok untuk pertemuan berdasarkan tanggal, kelas, program, dan jam.
-     * Mengembalikan Jadwal jika ada yang cocok, atau null jika tidak ada (sesi di luar jadwal).
+     * Jadwal aktif untuk kelas (dan program, bila diberikan) pada tanggal tertentu: hari sama,
+     * minggu ke- cocok untuk jadwal bulanan, masih berlaku, dan belum dipakai sesi LAIN di tanggal itu.
+     * Jadwal khusus kelas diutamakan dibanding jadwal umum (kelas_id null).
+     *
+     * @return \Illuminate\Support\Collection<int, Jadwal>
      */
-    public function cariJadwalCocok(Pertemuan $pertemuan, string $jamMulai, ?string $jamSelesai = null): ?Jadwal
+    public function kandidatJadwal(int $kelasId, ?int $programId, string $tanggal, ?int $kecualiPertemuanId = null)
     {
         $hariList = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];
-        $tanggal  = Carbon::parse($pertemuan->tanggal)->startOfDay();
-        $hari     = $hariList[$tanggal->dayOfWeekIso - 1];
-        $mingguKe = (int) ceil($tanggal->day / 7);
+        $tgl      = Carbon::parse($tanggal)->startOfDay();
+        $hari     = $hariList[$tgl->dayOfWeekIso - 1];
+        $mingguKe = (int) ceil($tgl->day / 7);
 
-        // Ambil jadwal aktif untuk kelas & program ini di hari & minggu terkait (kelas spesifik diutamakan)
-        $kandidat = Jadwal::query()
-            ->where('program_id', $pertemuan->program_id)
-            ->where(fn ($q) => $q->whereNull('kelas_id')->orWhere('kelas_id', $pertemuan->kelas_id))
+        return Jadwal::query()
+            ->when($programId, fn ($q) => $q->where('program_id', $programId))
+            ->where(fn ($q) => $q->whereNull('kelas_id')->orWhere('kelas_id', $kelasId))
             ->where('hari', $hari)
             ->where(function ($q) use ($mingguKe) {
                 $q->where('frekuensi', 'mingguan')
                   ->orWhere(fn ($q2) => $q2->where('frekuensi', 'bulanan')->where('minggu_ke', $mingguKe));
             })
-            ->where('mulai_berlaku', '<=', $tanggal->toDateString())
-            ->where(fn ($q) => $q->whereNull('selesai_berlaku')->orWhere('selesai_berlaku', '>=', $tanggal->toDateString()))
+            ->where('mulai_berlaku', '<=', $tgl->toDateString())
+            ->where(fn ($q) => $q->whereNull('selesai_berlaku')->orWhere('selesai_berlaku', '>=', $tgl->toDateString()))
             ->orderByDesc('kelas_id')
-            ->get();
-
-        // Singkirkan jadwal yang sudah dipakai sesi LAIN pada tanggal tersebut
-        $kandidat = $kandidat->filter(function (Jadwal $j) use ($pertemuan, $tanggal) {
-            return !Pertemuan::where('jadwal_id', $j->id)
-                ->where('tanggal', $tanggal->toDateString())
-                ->where('id', '!=', $pertemuan->id)
+            ->get()
+            ->filter(fn (Jadwal $j) => ! Pertemuan::where('jadwal_id', $j->id)
+                ->where('tanggal', $tgl->toDateString())
+                ->when($kecualiPertemuanId, fn ($q) => $q->where('id', '!=', $kecualiPertemuanId))
                 ->whereIn('status', ['berlangsung', 'selesai'])
-                ->exists();
-        });
+                ->exists())
+            ->values();
+    }
+
+    /**
+     * Tentukan jadwal untuk sesi yang BELUM punya jadwal_id (dipakai Asisten AI), hanya berdasarkan
+     * tanggal/kelas/program — jam boleh belum diketahui. Bila ada beberapa kandidat, dipilih yang
+     * jam mulainya sama dengan $jamMulai; jika tetap ambigu dikembalikan null (jangan menebak).
+     */
+    public function cariJadwalUntukTanggal(int $kelasId, ?int $programId, string $tanggal, ?string $jamMulai = null): ?Jadwal
+    {
+        $kandidat = $this->kandidatJadwal($kelasId, $programId, $tanggal);
+
+        if ($kandidat->count() === 1) {
+            return $kandidat->first();
+        }
+
+        if ($kandidat->count() > 1 && $jamMulai) {
+            $cocok = $kandidat->filter(fn (Jadwal $j) => substr((string) $j->jam_mulai, 0, 5) === substr($jamMulai, 0, 5));
+
+            return $cocok->count() === 1 ? $cocok->first() : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Cari jadwal aktif yang cocok untuk pertemuan berdasarkan tanggal, kelas, program, dan jam.
+     * Mengembalikan Jadwal jika ada yang cocok, atau null jika tidak ada (sesi di luar jadwal).
+     */
+    public function cariJadwalCocok(Pertemuan $pertemuan, string $jamMulai, ?string $jamSelesai = null): ?Jadwal
+    {
+        $tanggal = Carbon::parse($pertemuan->tanggal)->startOfDay();
+
+        $kandidat = $this->kandidatJadwal(
+            (int) $pertemuan->kelas_id,
+            $pertemuan->program_id ? (int) $pertemuan->program_id : null,
+            $tanggal->toDateString(),
+            $pertemuan->id,
+        );
 
         if ($kandidat->isEmpty()) {
             return null;
