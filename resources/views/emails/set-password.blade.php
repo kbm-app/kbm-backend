@@ -1,24 +1,16 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-</head>
-<body style="font-family: sans-serif; color: #1f2937;">
-    <p>Halo {{ $user->name }},</p>
+@extends('emails.layout')
 
-    <p>Akun Anda di {{ config('app.name') }} telah dibuat. Silakan klik tombol di bawah ini untuk mengatur password Anda sebelum login.</p>
+@section('judul', 'Atur Password Akun Anda')
+@section('subjudul', 'Akun Anda di '.config('app.name').' telah dibuat')
 
-    <p>
-        <a href="{{ $setPasswordUrl }}" style="display: inline-block; padding: 10px 20px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px;">
-            Atur Password
-        </a>
-    </p>
+@section('content')
+    <p style="margin: 0 0 16px;">Halo <strong style="color: #0f172a;">{{ $user->name }}</strong>,</p>
 
-    <p>Atau salin tautan berikut ke browser Anda:</p>
-    <p><a href="{{ $setPasswordUrl }}">{{ $setPasswordUrl }}</a></p>
+    <p style="margin: 0 0 8px;">Akun Anda di {{ config('app.name') }} telah dibuat. Silakan klik tombol di bawah ini untuk mengatur password Anda sebelum login.</p>
 
-    <p style="color: #6b7280; font-size: 14px;">Tautan ini berlaku selama 60 menit sejak email ini dikirim. Jika Anda meminta tautan baru sebelum tautan ini digunakan, tautan lama tidak akan berlaku lagi — gunakan email terbaru yang Anda terima.</p>
+    @include('emails.partials.tombol', ['url' => $setPasswordUrl, 'label' => 'Atur Password'])
 
-    <p>Jika Anda tidak merasa meminta akun ini, abaikan email ini.</p>
-</body>
-</html>
+    <p style="margin: 24px 0 0; font-size: 13px; line-height: 20px; color: #64748b;">Tautan ini berlaku selama 60 menit sejak email ini dikirim. Jika Anda meminta tautan baru sebelum tautan ini digunakan, tautan lama tidak akan berlaku lagi &mdash; gunakan email terbaru yang Anda terima.</p>
+
+    <p style="margin: 12px 0 0; font-size: 13px; line-height: 20px; color: #64748b;">Jika Anda tidak merasa meminta akun ini, abaikan email ini.</p>
+@endsection
