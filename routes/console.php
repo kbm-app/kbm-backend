@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\KirimReminderAbsensiPengajarJob;
 use App\Jobs\KirimReminderJadwalJob;
 use App\Jobs\KirimReminderKasJob;
 use Illuminate\Foundation\Inspiring;
@@ -12,6 +13,9 @@ Artisan::command('inspire', function () {
 
 // Reminder jadwal: setiap hari pukul 07:00
 Schedule::job(new KirimReminderJadwalJob)->dailyAt('07:00');
+
+// Reminder absensi ke pengajar yang masih punya sesi belum diabsen: setiap hari pukul 19:00 GMT+8
+Schedule::job(new KirimReminderAbsensiPengajarJob)->dailyAt('19:00')->timezone(KirimReminderAbsensiPengajarJob::ZONA_WAKTU);
 
 // Reminder kas/shodaqoh: tanggal 1 dan 15 setiap bulan pukul 08:00
 Schedule::job(new KirimReminderKasJob)->twiceMonthly(1, 15, '08:00');
