@@ -18,17 +18,23 @@ class ReminderAbsensiMail extends Mailable
     /** @var Collection<string, Collection<int, array<string, mixed>>> sesi dikelompokkan per tanggal (Y-m-d) */
     public Collection $sesiPerTanggal;
 
+    public int $totalSesi;
+
+    public int $jumlahHari;
+
     /** @param Collection<int, array<string, mixed>> $sesi */
     public function __construct(public string $nama, Collection $sesi)
     {
         $this->sesiPerTanggal = $sesi->groupBy(fn ($s) => $s['tanggal']->toDateString());
+        $this->totalSesi      = $sesi->count();
+        $this->jumlahHari     = $this->sesiPerTanggal->count();
         $this->appUrl         = rtrim(config('app.frontend_url'), '/').'/absensi';
     }
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: sprintf('Pengingat: %d sesi belum diabsen', $this->sesiPerTanggal->flatten(1)->count()),
+            subject: sprintf('Pengingat: %d sesi belum diabsen', $this->totalSesi),
         );
     }
 

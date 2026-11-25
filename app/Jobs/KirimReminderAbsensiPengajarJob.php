@@ -12,8 +12,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 /**
- * Email pengingat ke pengajar aktif yang masih punya sesi belum diabsen.
- * Pengajar yang semua sesinya sudah diabsen tidak dikirimi apa pun.
+ * Email pengingat ke user yang berhak mengisi absensi (pengajar, serta ketua/penerobos kelas)
+ * dan masih punya sesi belum diabsen. Yang semua sesinya sudah diabsen tidak dikirimi apa pun.
  */
 class KirimReminderAbsensiPengajarJob implements ShouldQueue
 {
@@ -30,9 +30,9 @@ class KirimReminderAbsensiPengajarJob implements ShouldQueue
             try {
                 Mail::to($p['email'])->send(new ReminderAbsensiMail($p['nama'], $p['sesi']));
             } catch (\Throwable $e) {
-                // Satu kegagalan tidak boleh menghentikan pengiriman ke pengajar lain
+                // Satu kegagalan tidak boleh menghentikan pengiriman ke penerima lain
                 Log::error('KirimReminderAbsensiPengajarJob gagal', [
-                    'pengajar_id' => $p['pengajar']->id,
+                    'user_id'     => $p['user']->id,
                     'error'       => $e->getMessage(),
                 ]);
             }

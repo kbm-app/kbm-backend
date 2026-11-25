@@ -2,16 +2,21 @@
 
 namespace App\Services;
 
+use App\Enums\JabatanPengurus;
 use App\Models\Jadwal;
+use App\Models\KelasPengurus;
 use App\Models\Libur;
 use App\Models\Pengajar;
 use App\Models\Pertemuan;
+use App\Models\User;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
 /**
- * Mencari sesi terjadwal yang absensinya belum dilakukan, dikelompokkan per pengajar.
+ * Mencari sesi terjadwal yang absensinya belum dilakukan, dikelompokkan per user yang berhak
+ * mengisinya: pengajar jadwal/sesi itu, serta murid pengurus kelas berjabatan ketua atau
+ * penerobos (sama dengan aturan PertemuanPolicy). Super admin tidak diikutkan.
  *
  * Sebuah sesi (jadwal pada satu tanggal) dianggap BELUM diabsen bila jam selesainya sudah lewat dan:
  *  - belum ada pertemuan sama sekali, atau
@@ -23,8 +28,8 @@ class ReminderAbsensiService
     private const HARI = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];
 
     /**
-     * @return Collection<int, array{pengajar: Pengajar, nama: string, email: string, sesi: Collection<int, array<string, mixed>>}>
-     *         dikunci id pengajar; hanya pengajar aktif yang punya sesi belum diabsen
+     * @return Collection<int, array{user: User, nama: string, email: string, sesi: Collection<int, array<string, mixed>>}>
+     *         dikunci id user; hanya akun aktif beremail yang punya sesi belum diabsen
      */
     public function belumDiabsen(CarbonInterface $sekarang, int $hariMundur = 14): Collection
     {
@@ -51,8 +56,22 @@ class ReminderAbsensiService
 
         $libur = Libur::query()->beririsan($dari->toDateString(), $hariIni->toDateString())->get();
 
-        /** @var array<int, array<int, array<string, mixed>>> $sesiPerPengajar */
-        $sesiPerPengajar = [];
+        // Pengurus yang boleh mengisi absensi: jabatan ketua/penerobos dan murid-nya masih aktif di kelas itu
+        $pengurusPerKelas = KelasPengurus::query()
+            ->whereIn('kelas_id', $jadwals->pluck('kelas_id')->unique())
+            ->whereIn('jabatan', array_map(fn ($j) => $j->value, JabatanPengurus::pengelolaAbsensi()))
+            ->whereHas('murid', fn ($m) => $m->whereNull('murid.deleted_at')->whereNotNull('user_id')
+                ->whereHas('kelasAktif', fn ($k) => $k->whereColumn('murid_kelas.kelas_id', 'kelas_pengurus.kelas_id')))
+            ->with('murid')
+            ->get()
+            ->groupBy('kelas_id')
+            ->map(fn ($g) => $g->pluck('murid.user_id')->unique()->values());
+
+        // id pengajar aktif => id user-nya
+        $userPengajar = Pengajar::query()->where('is_aktif', true)->pluck('user_id', 'id');
+
+        /** @var array<int, array<int, array<string, mixed>>> $sesiPerUser */
+        $sesiPerUser = [];
 
         foreach ($jadwals as $jadwal) {
             for ($tgl = $dari->copy(); $tgl->lte($hariIni); $tgl->addDay()) {
@@ -60,7 +79,7 @@ class ReminderAbsensiService
                     continue;
                 }
 
-                // Sesi hari ini yang belum selesai berlangsung belum boleh ditagih
+                // Sesi yang jam selesainya belum lewat belum boleh ditagih
                 if (Carbon::parse($tgl->toDateString().' '.$jadwal->jam_selesai, $sekarang->timezone)->gt($sekarang)) {
                     continue;
                 }
@@ -75,40 +94,47 @@ class ReminderAbsensiService
                     continue;
                 }
 
-                // Sesi yang sudah dibuka: yang ditagih pengajar yang tercatat bertugas. Belum dibuka: semua pengajar jadwal.
+                // Sesi yang sudah dibuka: pengajar yang tercatat bertugas. Belum dibuka: semua pengajar jadwal.
                 $pengajarIds = $sesi
                     ? $sesi->absensiPengajar->pluck('pengajar_id')->push($sesi->pengajar_id)->unique()
                     : $jadwal->pengajar->pluck('id');
 
-                foreach ($pengajarIds as $pengajarId) {
-                    $sesiPerPengajar[$pengajarId][] = [
-                        'tanggal'     => $tgl->copy(),
-                        'kelas'       => $jadwal->kelas->nama,
-                        'program'     => $jadwal->program->nama ?? '-',
-                        'jam_mulai'   => substr($jadwal->jam_mulai, 0, 5),
-                        'jam_selesai' => substr($jadwal->jam_selesai, 0, 5),
+                // Penagih = pengajar di atas + pengurus kelas (ketua/penerobos), tanpa duplikat
+                $userIds = $pengajarIds
+                    ->map(fn ($id) => $userPengajar[$id] ?? null)
+                    ->merge($pengurusPerKelas[$jadwal->kelas_id] ?? [])
+                    ->filter()
+                    ->unique();
+
+                foreach ($userIds as $userId) {
+                    $sesiPerUser[$userId][] = [
+                        'tanggal'      => $tgl->copy(),
+                        'kelas'        => $jadwal->kelas->nama,
+                        'program'      => $jadwal->program->nama ?? '-',
+                        'jam_mulai'    => substr($jadwal->jam_mulai, 0, 5),
+                        'jam_selesai'  => substr($jadwal->jam_selesai, 0, 5),
                         'sudah_dibuka' => $sesi !== null,
                     ];
                 }
             }
         }
 
-        if (! $sesiPerPengajar) {
+        if (! $sesiPerUser) {
             return collect();
         }
 
-        // Pengajar yang sudah nonaktif/dihapus atau akunnya tidak punya email tidak diingatkan
-        return Pengajar::query()
-            ->whereIn('id', array_keys($sesiPerPengajar))
-            ->where('is_aktif', true)
-            ->with('user')
+        // Akun nonaktif/dihapus atau tanpa email tidak diingatkan (User memakai SoftDeletes)
+        return User::query()
+            ->whereIn('id', array_keys($sesiPerUser))
+            ->where('is_active', true)
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
             ->get()
-            ->filter(fn (Pengajar $p) => $p->user && ! $p->user->trashed() && filled($p->user->email))
-            ->mapWithKeys(fn (Pengajar $p) => [$p->id => [
-                'pengajar' => $p,
-                'nama'     => $p->user->name,
-                'email'    => $p->user->email,
-                'sesi'     => collect($sesiPerPengajar[$p->id])
+            ->mapWithKeys(fn (User $u) => [$u->id => [
+                'user'  => $u,
+                'nama'  => $u->name,
+                'email' => $u->email,
+                'sesi'  => collect($sesiPerUser[$u->id])
                     ->sortBy(fn ($s) => $s['tanggal']->toDateString().$s['jam_mulai'])
                     ->values(),
             ]]);

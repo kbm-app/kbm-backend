@@ -24,6 +24,7 @@ class ReminderAbsensiPengajarTest extends TestCase
     private int $kelasId;
     private int $programId;
     private int $pengajarId;
+    private int $userId;
     private int $jadwalId;
 
     protected function setUp(): void
@@ -40,6 +41,7 @@ class ReminderAbsensiPengajarTest extends TestCase
         $this->kelasId = DB::table('kelas')->insertGetId([
             'nama' => 'Kelas 5', 'is_aktif' => true, 'created_at' => $now, 'updated_at' => $now,
         ]);
+        $this->userId = $user->id;
         $this->pengajarId = DB::table('pengajar')->insertGetId([
             'user_id' => $user->id, 'jenis_kelamin' => 'L', 'tanggal_bergabung' => '2026-01-01',
             'is_aktif' => true, 'created_at' => $now, 'updated_at' => $now,
@@ -75,7 +77,7 @@ class ReminderAbsensiPengajarTest extends TestCase
     {
         $hasil = app(ReminderAbsensiService::class)->belumDiabsen($this->sekarang());
 
-        return $hasil->get($this->pengajarId)['sesi']->map(fn ($s) => $s['tanggal']->toDateString())->all() ?? [];
+        return $hasil->get($this->userId)['sesi']->map(fn ($s) => $s['tanggal']->toDateString())->all() ?? [];
     }
 
     public function test_sesi_tanpa_pertemuan_ditagih_per_tanggal(): void
@@ -88,7 +90,7 @@ class ReminderAbsensiPengajarTest extends TestCase
         $this->buatPertemuan('2026-11-16', 'selesai');
         $this->buatPertemuan('2026-11-23', 'batal');
 
-        $this->assertNull(app(ReminderAbsensiService::class)->belumDiabsen($this->sekarang())->get($this->pengajarId));
+        $this->assertNull(app(ReminderAbsensiService::class)->belumDiabsen($this->sekarang())->get($this->userId));
     }
 
     public function test_sesi_berlangsung_tetap_ditagih(): void
@@ -140,11 +142,63 @@ class ReminderAbsensiPengajarTest extends TestCase
     public function test_pengajar_nonaktif_atau_tanpa_email_dilewati(): void
     {
         DB::table('pengajar')->where('id', $this->pengajarId)->update(['is_aktif' => false]);
-        $this->assertNull(app(ReminderAbsensiService::class)->belumDiabsen($this->sekarang())->get($this->pengajarId));
+        $this->assertNull(app(ReminderAbsensiService::class)->belumDiabsen($this->sekarang())->get($this->userId));
 
         DB::table('pengajar')->where('id', $this->pengajarId)->update(['is_aktif' => true]);
         DB::table('users')->where('email', 'ustadz@example.com')->update(['email' => '']);
-        $this->assertNull(app(ReminderAbsensiService::class)->belumDiabsen($this->sekarang())->get($this->pengajarId));
+        $this->assertNull(app(ReminderAbsensiService::class)->belumDiabsen($this->sekarang())->get($this->userId));
+    }
+
+    /** Murid pengurus di kelas ini; mengembalikan id user-nya. */
+    private function buatPengurus(string $jabatan, string $email, bool $aktifDiKelas = true): int
+    {
+        $user    = User::factory()->create(['role' => UserRole::Murid, 'email' => $email]);
+        $muridId = DB::table('murid')->insertGetId([
+            'user_id' => $user->id, 'nama' => 'Murid '.$jabatan, 'jenis_kelamin' => 'L', 'tanggal_lahir' => '2015-01-01',
+            'tanggal_masuk' => '2026-07-01', 'status' => 'aktif', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('murid_kelas')->insert([
+            'murid_id' => $muridId, 'kelas_id' => $this->kelasId, 'tahun_ajaran' => '2026/2027', 'tanggal_masuk' => '2026-07-01',
+            'tanggal_keluar' => $aktifDiKelas ? null : '2026-11-01', 'status' => $aktifDiKelas ? 'aktif' : 'pindah',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('kelas_pengurus')->insert([
+            'kelas_id' => $this->kelasId, 'murid_id' => $muridId, 'jabatan' => $jabatan, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return $user->id;
+    }
+
+    public function test_ketua_dan_penerobos_ikut_ditagih_tetapi_bendahara_dan_pengurus_yang_sudah_pindah_tidak(): void
+    {
+        $ketua     = $this->buatPengurus('ketua', 'ketua@example.com');
+        $penerobos = $this->buatPengurus('penerobos', 'penerobos@example.com');
+        $bendahara = $this->buatPengurus('bendahara', 'bendahara@example.com');
+        $pindah    = $this->buatPengurus('ketua', 'pindah@example.com', aktifDiKelas: false);
+
+        $hasil = app(ReminderAbsensiService::class)->belumDiabsen($this->sekarang());
+
+        $this->assertEqualsCanonicalizing([$this->userId, $ketua, $penerobos], $hasil->keys()->all());
+        $this->assertNull($hasil->get($bendahara));
+        $this->assertNull($hasil->get($pindah));
+        $this->assertSame(['2026-11-16', '2026-11-23'], $hasil->get($ketua)['sesi']->map(fn ($s) => $s['tanggal']->toDateString())->all());
+    }
+
+    public function test_pengurus_tidak_ditagih_bila_semua_sesi_selesai(): void
+    {
+        $ketua = $this->buatPengurus('ketua', 'ketua@example.com');
+        $this->buatPertemuan('2026-11-16', 'selesai');
+        $this->buatPertemuan('2026-11-23', 'selesai');
+
+        $this->assertNull(app(ReminderAbsensiService::class)->belumDiabsen($this->sekarang())->get($ketua));
+    }
+
+    public function test_akun_nonaktif_tidak_dikirimi(): void
+    {
+        $ketua = $this->buatPengurus('ketua', 'ketua@example.com');
+        DB::table('users')->where('id', $ketua)->update(['is_active' => false]);
+
+        $this->assertNull(app(ReminderAbsensiService::class)->belumDiabsen($this->sekarang())->get($ketua));
     }
 
     public function test_job_mengirim_satu_email_hanya_ke_pengajar_yang_belum_absen(): void
